@@ -1,15 +1,6 @@
 {
   "functions": {
-    "api/index.php": {
-      "runtime": "vercel-php@0.7.1"
-    },
-    "api/nivel.php": {
-      "runtime": "vercel-php@0.7.1"
-    },
-    "api/levelSetOnSite.php": {
-      "runtime": "vercel-php@0.7.1"
-    },
-    "api/phpinfo.php": {
+    "api/*.php": {
       "runtime": "vercel-php@0.7.1"
     }
   },
