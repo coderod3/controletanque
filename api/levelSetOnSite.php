@@ -25,10 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         );
         file_put_contents($logFile, $logEntry, FILE_APPEND);
 
-        echo 5; // Return the new level sent in the GET request
+        echo $newLevel; // Return the new level sent in the GET request
     } else {
         $contents = file_get_contents($file);
-        echo 5;
+        echo $contents;
     }
 }
 ?>
