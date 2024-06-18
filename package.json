@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@vercel/postgres": "^0.8.0",
-    "postgres": "^3.4.4",
-    "postgres-pdo": "^0.0.24"
-  }
-}
