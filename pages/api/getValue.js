@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       const updateQuery = 'UPDATE valores SET col1 = $1';
       await client.query(updateQuery, [level]);
 
-      res.status(200).json({ message: `Level set to ${level}` });
+      res.status(200).result(level);
     } else {
       // If no ?level=<value> is provided, retrieve the current level from the database
       const selectQuery = 'SELECT col1 FROM valores';
