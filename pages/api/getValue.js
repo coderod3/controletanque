@@ -2,7 +2,7 @@ import { sql } from "@vercel/postgres";
 
 export default async function handler(req, res) {
   try {
-    const { rows } = await sql`SELECT col1 FROM my_table LIMIT 1`;
+    const { rows } = await sql`SELECT col1 FROM VALORES LIMIT 1`;
 
     if (rows.length > 0) {
       const value = rows[0].col1;
