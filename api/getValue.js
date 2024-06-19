@@ -3,7 +3,7 @@ import { sql } from "@vercel/postgres";
 export default async function handler(req, res) {
   try {
     // Consulta o banco de dados
-    const { rows } = await sql`SELECT col1 FROM my_table LIMIT 1`;
+    const { rows } = await sql`SELECT col1 FROM valores LIMIT 1`;
 
     // Verifica se há resultados
     if (rows.length > 0) {
