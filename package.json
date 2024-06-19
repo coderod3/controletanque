@@ -4,6 +4,7 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "@vercel/postgres": "^0.3.0"
+    "@vercel/postgres": "^0.3.0",
+    "pg": "^8.12.0"
   }
 }
