@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nível do Tanque</title>
+<link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
+<style>
+    /* CSS styles here */ 
+    /* VERSÃO com AGUA 1.0 PRONTA */ 
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 0;
+        padding-top: 5px;
+        background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(199, 220, 39));
+        /*background-color: lightblue; /* Light blue background */
+    }
+    #tank-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        position: relative;
+    }
+    #tank {
+        width: 300px;
+        height: 300px; /* Default height */
+        background-color: transparent;
+        border: 2px solid #000;
+        border-radius: 20px; /* Rounded corners */
+        margin: 0 auto;
+        position: relative;
+        overflow: hidden; /* Hide overflowing water */
+    }
+    #water {
+        background: url("https://raw.githubusercontent.com/BrBoy/website/006265231eb2c5d415bdd6ee2e05a202a4a4d828/agua.svg");
+        background-repeat: repeat-x;
+        /*animation: infinite linear agua 5s;*/
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 0;
+        /*background-color: rgb(21, 21, 192);*/
+        transition: height 1s ease;
+    }
+
+    @keyframes agua {
+
+        0% {
+            background-position: 0px 200px;
+        }
+
+        50% {
+            background-position: 1200px -5px;
+        }
+
+        100% {
+            background-position: 0px 200px;
+        }
+    }
+    #slider-container {
+        margin-top: 20px; /* Adjust the position */
+    }
+    #slider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 300px; /* Set slider width */
+        height: 20px; /* Set slider height */
+        background: #f0f0f0; /* Grey background */
+        outline: none;
+        opacity: 0.7; /* Set transparency */
+        -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+        transition: opacity .2s;
+        border-radius: 20px;
+        position: relative;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    #slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 50px; /* Set thumb width */
+        height: 50px; /* Set thumb height */
+        background: #048bcf; /* Blue thumb */
+        border-radius: 50%; /* Round the thumb */
+        cursor: pointer;
+    }
+    #slider::-moz-range-thumb {
+        width: 50px; /* Set thumb width */
+        height: 50px; /* Set thumb height */
+        background: #008CBA; /* Blue thumb */
+        border-radius: 50%; /* Round the thumb */
+        cursor: pointer;
+    }
+    #controls {
+        margin-top: 20px;
+    }
+    input[type="number"] {
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 10px; /* Rounded corners */
+        border: none;
+        margin-top: 20px; /* Adjust the position */
+    }
+    button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 10px; /* Rounded corners */
+        border: none;
+        background-color: #008CBA; /* Blue button */
+        color: white;
+        transition: background-color 0.3s; /* Smooth color transition */
+    }
+    button:hover {
+        background-color: #005f6b; /* Darker blue on hover */
+    }
+    .logo {
+        position: absolute;
+        bottom: 0;
+        width: 13%;
+        height: 14%;
+    }
+
+    .rodape {
+        position: absolute;
+        bottom: 0;
+        width: 33%;
+        height: 12%;
+        color: #fff;
+        text-decoration: underline;
+    }
+    
+</style>
+</head>
+<body>
+    <!--<audio controls preload loop>
+        <source src="song1.mp3" type="audio/mp3">
+        <embed src="song1.mp3" loop>
+    </audio>-->
+    <h1 style="color: #150857";>CONTROLE DE NIVEL DE TANQUE</h1>
+    <h3 style="color: #150857";>100L</h3>
+    <div id="tank-container">
+        <div id="tank">
+            <div id="water"></div>
+        </div>
+    </div>
+    <div class="tank">
+        <div class="water-container">
+            <div class="water" id="water"></div>
+        </div>
+    </div>
+    <div id="slider-container">
+        <input type="range" min="0" max="100" value="50" id="slider" oninput="sliderTodesiredLevel()">
+    </div>
+    <div id="controls">
+        <input type="number" id="desiredWaterLevel" placeholder="Litros no tanque (%)"> <!--oninput="updateSlider()"-->
+        <button onclick="setWaterLevel(); updateSlider();">Novo Nivel</button>
+    </div>
+    <script>
+        var tankHeight = 20; // Height of the physical tank in cm
+        //var previousLevelCm = 0;
+        var newLevelCm = 0;
+        function setWaterLevel() {
+            console.log("SET LEVEL CALLED");
+            //var levelToCm = (parseFloat(document.getElementById('desiredWaterLevel').value) / 100) * tankHeight;
+            var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
+            var levelToCm = (desiredLevel / 100) * tankHeight;
+            newLevelCm = (tankHeight - levelToCm).toFixed(2);
+            
+            var userAgent = navigator.userAgent;
+            var userIP = '';
+
+            // Get the user's IP address
+            fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => {
+                    userIP = data.ip;
+                    var xhr = new XMLHttpRequest();
+                    xhr.open("GET", "/api/levelSetOnSite.php?newLevel=" + encodeURIComponent(newLevelCm) + "&userAgent=" + encodeURIComponent(userAgent) + "&userIP=" + encodeURIComponent(userIP), true);
+                    
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState == 4 && xhr.status == 200) {
+                            console.log(xhr.responseText);
+                        }
+                    };
+                    xhr.send();
+                })
+                .catch(error => {
+                    console.error('Error fetching IP address:', error);
+                });
+
+        }
+        //previousLevelCm = newLevelCm;
+
+        function updateSlider() {
+            var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
+            document.getElementById('slider').value = desiredLevel;
+        }
+
+        function sliderTodesiredLevel() {
+            var desiredLevel = parseFloat(document.getElementById('slider').value);
+            document.getElementById('desiredWaterLevel').value = desiredLevel;
+        }
+
+        function getLevel() {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "/api/nivel.php", true); // Modify the URL to your PHP script
+            //xhr.open("GET", "getLevelToSite.php", true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var waterLevelCm = parseFloat(xhr.responseText);
+                    updateWaterDisplay(waterLevelCm);
+                }
+            };
+            xhr.send();
+        }
+
+        function updateWaterDisplay(waterLevelCm) {
+            if (waterLevelCm > tankHeight) {
+                console.warn("Sensor reading exceeds tank height. Ignoring...");
+                return; // Exit the function early
+            }
+
+            var waterLevelPercentage = ((tankHeight - waterLevelCm) / tankHeight) * 100;
+            console.log("Water level percentage: " + waterLevelPercentage);
+
+            var tankPixelHeight = 300; // Height of the tank in pixels
+            var waterPixelHeight = (waterLevelPercentage / 100) * tankPixelHeight;
+            console.log("Water pixel height: " + waterPixelHeight);
+
+            //document.getElementById('water').style.height = waterPixelHeight + 'px';
+            console.log("says it updated water css")
+        }
+        //for testing the level display
+        //document.getElementById('water').style.height = 150 + 'px';
+        setInterval(getLevel, 500); // Update every 1 second (adjust as needed)
+    </script>
+    <div class="logo">
+        <img src="https://raw.githubusercontent.com/BrBoy/website/main/industria.png" alt="logo"  width="100px" height="60px">
+    </div>
+    <div class="rodape" id="rodape">
+        <h5>SoftWare para Industrias</h5>
+    </div>
+</body>
+</html>
