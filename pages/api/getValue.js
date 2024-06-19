@@ -17,13 +17,13 @@ export default async function handler(req, res) {
     if (req.query.level) {
       // If ?level=<value> is provided in the URL, update the database
       const level = parseInt(req.query.level); // Parse the level parameter to an integer
-      const updateQuery = 'UPDATE valores SET col1 = $1 WHERE id = 1';
+      const updateQuery = 'UPDATE valores SET col1 = $1';
       await client.query(updateQuery, [level]);
 
       res.status(200).json({ message: `Level set to ${level}` });
     } else {
       // If no ?level=<value> is provided, retrieve the current level from the database
-      const selectQuery = 'SELECT col1 FROM valores WHERE id = 1';
+      const selectQuery = 'SELECT col1 FROM valores';
       const result = await client.query(selectQuery);
 
       if (result.rows.length > 0) {
