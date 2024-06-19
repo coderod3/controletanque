@@ -14,10 +14,17 @@ const pool = new Pool({
 export default async function handler(req, res) {
   try {
     const client = await pool.connect();
-    res.status(200).json({ message: "Connection successful" });
+    const result = await client.query('SELECT col1 FROM valores LIMIT 1');
     client.release();
+
+    if (result.rows.length > 0) {
+      const value = result.rows[0].col1;
+      res.status(200).json({ value });
+    } else {
+      res.status(404).json({ error: "No data found" });
+    }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Connection failed" });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
