@@ -18,8 +18,8 @@ export default async function handler(req, res) {
     client.release();
 
     if (result.rows.length > 0) {
-      const value = result.rows[0].col1.value;
-      res.status(200).json({ value });
+      const value = result.rows[0].col1;
+      res.status(200).json(value);
     } else {
       res.status(404).json({ error: "No data found" });
     }
