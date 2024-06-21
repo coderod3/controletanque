@@ -205,16 +205,14 @@
         }
 
         function getLevel() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/pages/api/levelToSite.js", true); // Modify the URL to your PHP script
-            //xhr.open("GET", "getLevelToSite.php", true);
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState == 4 && xhr.status == 200) {
-                    var waterLevelCm = parseFloat(xhr.responseText);
+            fetch("/pages/api/levelToSite.js")
+                .then(response => response.json())
+                .then(data => {
+                    const waterLevelCm = parseFloat(data.waterLevelCm);
                     updateWaterDisplay(waterLevelCm);
-                }
-            };
-            xhr.send();
+                })
+                .catch(error => console.error("Error fetching data:", error));
+
         }
 
         function updateWaterDisplay(waterLevelCm) {
