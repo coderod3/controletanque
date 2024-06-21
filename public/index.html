@@ -222,14 +222,14 @@
             }
 
             var waterLevelPercentage = ((tankHeight - waterLevelCm) / tankHeight) * 100;
-            console.log("Water level percentage: " + waterLevelPercentage);
+            //console.log("Water level percentage: " + waterLevelPercentage);
 
             var tankPixelHeight = 300; // Height of the tank in pixels
             var waterPixelHeight = (waterLevelPercentage / 100) * tankPixelHeight;
 
-            console.log("Water pixel height: " + waterPixelHeight);
+            //console.log("Water pixel height: " + waterPixelHeight);
             document.getElementById('water').style.height = waterPixelHeight + 'px';
-            console.log("says it updated water css" + toString(waterPixelHeight));
+            console.log("says it updated water css" + toString(waterPixelHeight) + tankHeight + waterLevelCm);
         }
         //for testing the level display
         //document.getElementById('water').style.height = 150 + 'px';
