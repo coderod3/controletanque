@@ -205,7 +205,7 @@
         }
 
         function getLevel() {
-            fetch("/pages/api/levelToSite")
+            fetch("/pages/api/levelToSite.js")
                 .then(response => response.json())
                 .then(data => {
                     const waterLevelCm = parseFloat(data.level);
