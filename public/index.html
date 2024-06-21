@@ -205,15 +205,16 @@
         }
 
         function getLevel() {
-            fetch("/pages/api/levelToSite.js")
+            fetch("/api/levelToSite")
                 .then(response => response.json())
                 .then(data => {
-                    const waterLevelCm = parseFloat(data.waterLevelCm);
+                    const waterLevelCm = parseFloat(data.level);
+                    console.log("WATER LEVEL " + waterLevelCm);
                     updateWaterDisplay(waterLevelCm);
-                })
-                .catch(error => console.error("Error fetching data:", error));
-
+            })
+            .catch(error => console.error("Error fetching data:", error));
         }
+
 
         function updateWaterDisplay(waterLevelCm) {
             if (waterLevelCm > tankHeight) {
