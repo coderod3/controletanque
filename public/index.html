@@ -226,13 +226,13 @@
 
             var tankPixelHeight = 300; // Height of the tank in pixels
             var waterPixelHeight = (waterLevelPercentage / 100) * tankPixelHeight;
-            console.log("Water pixel height: " + waterPixelHeight);
 
+            console.log("Water pixel height: " + waterPixelHeight);
             document.getElementById('water').style.height = waterPixelHeight + 'px';
-            console.log("says it updated water css")
+            console.log("says it updated water css" + waterPixelHeight);
         }
         //for testing the level display
-        document.getElementById('water').style.height = 150 + 'px';
+        //document.getElementById('water').style.height = 150 + 'px';
         setInterval(getLevel, 500); // Update every 1 second (adjust as needed)
     </script>
     <div class="logo">
