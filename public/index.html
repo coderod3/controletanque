@@ -160,39 +160,44 @@
     </div>
     <script>
         var tankHeight = 20; // Height of the physical tank in cm
-        //var previousLevelCm = 0;
         var newLevelCm = 0;
-        function setWaterLevel() {
-            console.log("SET LEVEL CALLED");
-            //var levelToCm = (parseFloat(document.getElementById('desiredWaterLevel').value) / 100) * tankHeight;
-            var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
-            var levelToCm = (desiredLevel / 100) * tankHeight;
-            newLevelCm = (tankHeight - levelToCm).toFixed(2);
-            
-            var userAgent = navigator.userAgent;
-            var userIP = '';
 
-            // Get the user's IP address
-            fetch('https://api.ipify.org?format=json')
-                .then(response => response.json())
-                .then(data => {
-                    userIP = data.ip;
-                    var xhr = new XMLHttpRequest();
-                    xhr.open("GET", "/pages/api/levelFromSite.js?level=" + encodeURIComponent(newLevelCm) + "&userAgent=" + encodeURIComponent(userAgent) + "&userIP=" + encodeURIComponent(userIP), true);
-                    
-                    xhr.onreadystatechange = function () {
-                        if (xhr.readyState == 4 && xhr.status == 200) {
-                            console.log(xhr.responseText);
+    function setWaterLevel() {
+        console.log("SET LEVEL CALLED");
+        var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
+        var levelToCm = (desiredLevel / 100) * tankHeight;
+        var newLevelCm = (tankHeight - levelToCm).toFixed(2);
+
+        var userAgent = navigator.userAgent;
+
+        // Get the user's IP address
+        fetch('https://api.ipify.org?format=json')
+            .then(response => response.json())
+            .then(data => {
+                var userIP = data.ip;
+                var url = `/pages/api/levelFromSite.js?level=${encodeURIComponent(newLevelCm)}&userAgent=${encodeURIComponent(userAgent)}&userIP=${encodeURIComponent(userIP)}`;
+
+                fetch(url)
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('Network response was not ok');
                         }
-                    };
-                    xhr.send();
-                })
-                .catch(error => {
-                    console.error('Error fetching IP address:', error);
-                });
+                    })
+                    .then(data => {
+                        console.log("Level updated:", data.level);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                    });
+            })
+            .catch(error => {
+                console.error('Error fetching IP address:', error);
+            });
+    }
 
-        }
-        //previousLevelCm = newLevelCm;
+
 
         function updateSlider() {
             var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
@@ -204,6 +209,7 @@
             document.getElementById('desiredWaterLevel').value = desiredLevel;
         }
 
+        //gets level set by board
         function getLevel() {
             fetch("/pages/api/levelToSite.js")
                 .then(response => response.json())
@@ -214,7 +220,6 @@
             })
             .catch(error => console.error("Error fetching data:", error));
         }
-
 
         function updateWaterDisplay(waterLevelCm) {
             if (waterLevelCm > tankHeight) {
@@ -230,7 +235,7 @@
 
             //console.log("Water pixel height: " + waterPixelHeight);
             document.getElementById('water').style.height = waterPixelHeight + 'px';
-            console.log("says it updated water css" + toString(waterPixelHeight) + tankHeight + waterLevelCm);
+            console.log(`says it updated water css, tankpx: ${waterPixelHeight} theight: ${tankHeight} levelcm: ${waterLevelCm}`);
         }
         //for testing the level display
         //document.getElementById('water').style.height = 150 + 'px';
