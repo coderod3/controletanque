@@ -172,6 +172,7 @@
             // First, send the level to the levelFromSite endpoint
             fetch(`/pages/api/levelFromSite.js?level=${encodeURIComponent(newLevelCm)}`)
                 .then(response => {
+                    console.log(newLevelCm);
                     if (response.ok) {
                         return response.json();
                     } else {
