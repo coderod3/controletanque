@@ -187,7 +187,7 @@
                         .then(response => response.json())
                         .then(data => {
                             var userIP = data.ip;
-                            var logUrl = `/pages/api/logEp.js?level=${encodeURIComponent(newLevelCm)}&userAgent=${encodeURIComponent(userAgent)}&userIP=${encodeURIComponent(userIP)}`;
+                            var logUrl = `/pages/api/logsEp.js?level=${encodeURIComponent(newLevelCm)}&userAgent=${encodeURIComponent(userAgent)}&userIP=${encodeURIComponent(userIP)}`;
 
                             fetch(logUrl)
                                 .then(response => {
