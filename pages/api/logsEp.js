@@ -13,7 +13,7 @@ const pool = new Pool({
 module.exports = async (req, res) => {
   const userAgent = req.query.userAgent;
   const userIP = req.query.userIP;
-  const newLevel = parseFloat(req.query.newLevel);
+  const newLevel = parseFloat(req.query.level);
 
   if (userAgent && userIP && newLevel) {
     try {
