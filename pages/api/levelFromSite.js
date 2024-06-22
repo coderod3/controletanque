@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const client = await pool.connect();
 
     if (req.query.level) {
-      const level = parseFloat(req.query.level); // Parse the level parameter to an integer
+      const level = parseFloat(req.query.level); // Parse the level parameter to a float
       const updateQuery = 'UPDATE valores SET col2 = $1';
       await client.query(updateQuery, [level]);
       
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       const result = await client.query(selectQuery);
 
       if (result.rows.length > 0) {
-        const currentLevel = result.rows[0].col1;
+        const currentLevel = result.rows[0].col2; // Corrected from col1 to col2
         res.status(200).json({ level: currentLevel });
       } else {
         res.status(404).json({ error: "No level found" });
