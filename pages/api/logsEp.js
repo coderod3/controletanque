@@ -19,10 +19,9 @@ module.exports = async (req, res) => {
     try {
       const client = await pool.connect();
 
-      // Retrieve the previous level from the 'logs' table
-      const previousResult = await client.query('SELECT new_level FROM logs');
-      const lastRowIndex = result.rows.length - 1;
-      const lastLevel = lastRowIndex >= 0 ? result.rows[lastRowIndex].new_level : null;
+      // Retrieve the previous level from the 'valores' table
+      const previousResult = await client.query('SELECT col2 FROM valores');
+      const previousLevel = previousResult.rows.length > 0 ? previousResult.rows[0].col2 : null;
 
       // Log the information
       const logEntry = {
