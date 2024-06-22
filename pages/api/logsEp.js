@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
 
       // Retrieve the previous level from the 'logs' table
       const previousResult = await client.query('SELECT new_level FROM logs');
-      const previousLevel = previousResult.rows.length > 0 ? previousResult.rows[0].new_level : null;
+      const previousLevel = previousResult.rows.length > 0 ? previousResult.rows[this.length-1].new_level : null;
 
       // Log the information
       const logEntry = {
