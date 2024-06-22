@@ -167,6 +167,7 @@
             var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
             var levelToCm = (desiredLevel / 100) * tankHeight;
             var newLevelCm = (tankHeight - levelToCm).toFixed(2);
+            console.log(newLevelCm);
 
             // First, send the level to the levelFromSite endpoint
             fetch(`/pages/api/levelFromSite.js?level=${encodeURIComponent(newLevelCm)}`)
