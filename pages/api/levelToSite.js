@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const client = await pool.connect();
 
     if (req.query.level) {
-      const level = parseInt(req.query.level); // Parse the level parameter to an integer
+      const level = parseFloat(req.query.level); // Parse the level parameter to an integer
       const updateQuery = 'UPDATE valores SET col1 = $1';
       await client.query(updateQuery, [level]);
       

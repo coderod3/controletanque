@@ -1,4 +1,3 @@
-// Load environment variables from .env.development.local file
 require('dotenv').config({ path: '.env.development.local' });
 
 const { Pool } = require('pg');
@@ -10,36 +9,31 @@ const pool = new Pool({
   }
 });
 
-module.exports = async (req, res) => {
-  const newLevel = parseFloat(req.query.level);
+export default async function handler(req, res) {
+  try {
+    const client = await pool.connect();
 
-  if (newLevel) {
-    // Store the new level in the database and respond immediately
-    try {
-      const client = await pool.connect();
+    if (req.query.level) {
+      const level = parseFloat(req.query.level); // Parse the level parameter to an integer
+      const updateQuery = 'UPDATE valores SET col2 = $1';
+      await client.query(updateQuery, [level]);
+      
+      res.status(200).json({ level: level });
+    } else {
+      const selectQuery = 'SELECT col2 FROM valores';
+      const result = await client.query(selectQuery);
 
-      // Update the new level in the 'valores' table
-      await client.query('UPDATE valores SET col2 = $1', [newLevel]);
-
-      res.status(200).json({ level: newLevel });
-
-      client.release();
-    } catch (error) {
-      console.error('Error during database operations:', error);
-      res.status(500).json({ error: "Internal Server Error" });
+      if (result.rows.length > 0) {
+        const currentLevel = result.rows[0].col1;
+        res.status(200).json({ level: currentLevel });
+      } else {
+        res.status(404).json({ error: "No level found" });
+      }
     }
-  } else {
-    // If no new level is provided, return the current level from the 'valores' table
-    try {
-      const client = await pool.connect();
-      const result = await client.query('SELECT col2 FROM valores');
-      const currentLevel = result.rows.length > 0 ? result.rows[0].col2 : null;
-      res.status(200).json({ level: currentLevel });
 
-      client.release();
-    } catch (error) {
-      console.error('Error during database operations:', error);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
+    client.release();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-};
+}
