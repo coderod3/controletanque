@@ -24,8 +24,8 @@ export default async function handler(req, res) {
       const result = await client.query(selectQuery);
 
       if (result.rows.length > 0) {
-        const currentLevel = result.rows[0].col2; // Corrected from col1 to col2
-        res.status(200).json({ level: currentLevel });
+        const currentLevel = result.rows[0].col2; 
+        res.status(200).send(currentLevel.toString());   //////// here
       } else {
         res.status(404).json({ error: "No level found" });
       }

@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
       if (result.rows.length > 0) {
         const currentLevel = result.rows[0].col1;
-        res.status(200).json({ level: currentLevel });
+        res.status(200).json({ level: currentLevel });  ////////////// here
       } else {
         res.status(404).json({ error: "No level found" });
       }
