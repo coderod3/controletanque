@@ -1,7 +1,11 @@
 // Load environment variables from .env.development.local file
+console.log("WE OUTSIDE");
+
 require('dotenv').config({ path: '.env.development.local' });
+console.log("WE OUTSIDE");
 
 const { Pool } = require('pg');
+console.log("WE OUTSIDE");
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
@@ -9,6 +13,7 @@ const pool = new Pool({
     rejectUnauthorized: false  // Only for development; do not use in production without proper SSL setup
   }
 });
+console.log("WE OUTSIDE");
 
 module.exports = async (req, res) => {
   const userAgent = req.query.userAgent;
