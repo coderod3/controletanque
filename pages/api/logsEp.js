@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
       // Retrieve the previous level from the 'valores' table
       const previousResult = await client.query('SELECT previous_level FROM logs ORDER BY id DESC LIMIT 1;');
       // const previousLevel = previousResult.rows.length > 0 ? previousResult.rows[0].col2 : null; // here lastvalue  
-
+      console.log(previousResult);
       // Log the information
       const logEntry = {
         text: 'INSERT INTO logs (user_ip, user_agent, previous_level, new_level) VALUES ($1, $2, $3, $4)',
