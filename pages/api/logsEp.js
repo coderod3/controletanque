@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
   const userAgent = req.query.userAgent;
   const userIP = req.query.userIP;
   const newLevel = parseFloat(req.query.level);
-
+  console.log("WE OUTSIDE");
   if (userAgent && userIP && newLevel) {
     try {
       const client = await pool.connect();
