@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(199, 220, 39));
+            color: aliceblue;
+            width: 100%;
+            height: 100%;
+        }
+
+        div {
+            background-color: rgba(0, 0, 0, 0.6);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 40px;
+            border-radius: 15px;
+            color: aliceblue;
+
+        }
+
+        button {
+            background-image: linear-gradient(to right, rgb(39, 66, 241), rgb(72, 105, 243));
+            width: 100%;
+            border: none;
+            padding: 15px;
+            color: aliceblue;
+            font-size: 15px;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+
+        button:hover {
+            background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(12, 12, 230));
+        }
+
+        input {
+            padding: 15px;
+            border: none;
+            outline: none;
+            font-size: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="tela_login">
+        <h1>Login</h1>
+        <input type="text" placeholder="Login" id="Login">
+        <br><br>
+        <input type="password" placeholder="Senha" id="Senha">
+        <br><br>
+        <button onclick="logar()">Enviar</button>
+    </div>
+
+    <script>
+        function logar() {
+
+            var login = document.getElementById('Login').value;
+            var senha = document.getElementById('Senha').value;
+
+            if (login == "admin" && senha == "admin") {
+                location.href = "/public/index.html";
+            } else {
+                alert('Usuário ou senha incorretos');
+            }
+
+
+
+        }
+    </script>
+
+</body>
+
+</html>
