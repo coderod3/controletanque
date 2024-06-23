@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
       const client = await pool.connect();
       console.log("just befoooooore");
       // Retrieve the previous level from the 'valores' table
-      const previousResult = await client.query('SELECT new_level FROM logs ORDER BY id DESC LIMIT 1;');
+      const previousResult = await client.query('SELECT new_level FROM logs ORDER BY id DESC LIMIT 1');
       // const previousLevel = previousResult.rows.length > 0 ? previousResult.rows[0].col2 : null; // here lastvalue  
       console.log(previousResult);
       // Log the information
