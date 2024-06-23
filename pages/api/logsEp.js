@@ -20,13 +20,13 @@ module.exports = async (req, res) => {
       const client = await pool.connect();
 
       // Retrieve the previous level from the 'valores' table
-      const previousResult = await client.query('SELECT col2 FROM valores');
-      const previousLevel = previousResult.rows.length > 0 ? previousResult.rows[0].col2 : null;
+      const previousResult = await client.query('SELECT previous_level FROM logs ORDER BY id DESC LIMIT 1;');
+      // const previousLevel = previousResult.rows.length > 0 ? previousResult.rows[0].col2 : null; // here lastvalue  
 
       // Log the information
       const logEntry = {
         text: 'INSERT INTO logs (user_ip, user_agent, previous_level, new_level) VALUES ($1, $2, $3, $4)',
-        values: [userIP, userAgent, previousLevel, newLevel]
+        values: [userIP, userAgent, previousResult, newLevel]
       };
       await client.query(logEntry);
 
