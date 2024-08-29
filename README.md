@@ -34,8 +34,8 @@ O sistema é composto por duas placas Arduino conectadas entre si e ao site:
 1. **Clone o Repositório:**
     
     ```bash
-    git clone <https://github.com/seu_usuario/seu_repositorio.git>
-    cd seu_repositorio
+    git clone <https://github.com/coderod3/controletanque.git>
+    cd controletanque
     
     ```
     
