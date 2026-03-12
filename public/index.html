@@ -1,272 +1,202 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nível do Tanque</title>
-<link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
-<style>
-    /* CSS styles here */ 
-    /* VERSÃO com AGUA 1.0 PRONTA */ 
-    body {
-        font-family: Arial, sans-serif;
-        text-align: center;
-        margin: 0;
-        padding-top: 5px;
-        background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(199, 220, 39));
-        /*background-color: lightblue; /* Light blue background */
-    }
-    #tank-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 20px;
-        position: relative;
-    }
-    #tank {
-        width: 300px;
-        height: 300px; /* Default height */
-        background-color: transparent;
-        border: 2px solid #000;
-        border-radius: 20px; /* Rounded corners */
-        margin: 0 auto;
-        position: relative;
-        overflow: hidden; /* Hide overflowing water */
-    }
-    #water {
-        background: url("https://raw.githubusercontent.com/BrBoy/website/006265231eb2c5d415bdd6ee2e05a202a4a4d828/agua.svg");
-        background-repeat: repeat-x;
-        /*animation: infinite linear agua 5s;*/
-        position: absolute;
-        bottom: 0;
-        width: 100%;
-        height: 0;
-        /*background-color: rgb(21, 21, 192);*/
-        transition: height 1s ease;
-    }
-
-    @keyframes agua {
-
-        0% {
-            background-position: 0px 200px;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento - Controle de Tanque</title>
+    <link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
+    <style>
+        /* Estilos Globais */
+        :root {
+            --primary-color: #008CBA;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --white: #ffffff;
         }
 
-        50% {
-            background-position: 1200px -5px;
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        100% {
-            background-position: 0px 200px;
+        header {
+            margin-bottom: 30px;
+            text-align: center;
         }
-    }
-    #slider-container {
-        margin-top: 20px; /* Adjust the position */
-    }
-    #slider {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 300px; /* Set slider width */
-        height: 20px; /* Set slider height */
-        background: #f0f0f0; /* Grey background */
-        outline: none;
-        opacity: 0.7; /* Set transparency */
-        -webkit-transition: .2s; /* 0.2 seconds transition on hover */
-        transition: opacity .2s;
-        border-radius: 20px;
-        position: relative;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    #slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 50px; /* Set thumb width */
-        height: 50px; /* Set thumb height */
-        background: #048bcf; /* Blue thumb */
-        border-radius: 50%; /* Round the thumb */
-        cursor: pointer;
-    }
-    #slider::-moz-range-thumb {
-        width: 50px; /* Set thumb width */
-        height: 50px; /* Set thumb height */
-        background: #008CBA; /* Blue thumb */
-        border-radius: 50%; /* Round the thumb */
-        cursor: pointer;
-    }
-    #controls {
-        margin-top: 20px;
-    }
-    input[type="number"] {
-        padding: 10px;
-        font-size: 16px;
-        border-radius: 10px; /* Rounded corners */
-        border: none;
-        margin-top: 20px; /* Adjust the position */
-    }
-    button {
-        padding: 10px 20px;
-        font-size: 16px;
-        cursor: pointer;
-        border-radius: 10px; /* Rounded corners */
-        border: none;
-        background-color: #008CBA; /* Blue button */
-        color: white;
-        transition: background-color 0.3s; /* Smooth color transition */
-    }
-    button:hover {
-        background-color: #005f6b; /* Darker blue on hover */
-    }
-    .logo {
-        position: absolute;
-        bottom: 0;
-        width: 13%;
-        height: 14%;
-    }
 
-    .rodape {
-        position: absolute;
-        bottom: 0;
-        width: 33%;
-        height: 12%;
-        color: #fff;
-        text-decoration: underline;
-    }
-    
-</style>
+        h1 {
+            color: #150857;
+            margin-bottom: 5px;
+        }
+
+        .status-badge {
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        /* Container da Tabela */
+        .table-container {
+            width: 100%;
+            max-width: 1000px;
+            background: var(--white);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: left;
+            padding: 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.95em;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        /* Estilo para os Níveis */
+        .level-badge {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .diff-negative { color: #e74c3c; }
+        .diff-positive { color: #2ecc71; }
+
+        /* Rodapé */
+        .footer {
+            margin-top: 40px;
+            font-size: 0.8em;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .footer img {
+            opacity: 0.7;
+        }
+
+        /* Estado de Carregamento */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
 </head>
 <body>
-    <!--<audio controls preload loop>
-        <source src="song1.mp3" type="audio/mp3">
-        <embed src="song1.mp3" loop>
-    </audio>-->
-    <h1 style="color: #150857";>Controle de nível do tanque</h1>
-    <h3 style="color: #150857";>100L</h3>
-    <div id="tank-container">
-        <div id="tank">
-            <div id="water"></div>
-        </div>
+
+    <header>
+        <h1>Histórico de Operação</h1>
+        <span class="status-badge" id="lastUpdate">Atualizando...</span>
+    </header>
+
+    <div class="table-container">
+        <table id="logTable">
+            <thead>
+                <tr>
+                    <th>Tanque</th>
+                    <th>Data (Placa)</th>
+                    <th>Data (Servidor)</th>
+                    <th>Nível Ant.</th>
+                    <th>Nível Atual</th>
+                    <th>Variação</th>
+                </tr>
+            </thead>
+            <tbody id="logBody">
+                <tr>
+                    <td colspan="6" class="loading">Buscando dados no servidor...</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
-    <div class="tank">
-        <div class="water-container">
-            <div class="water" id="water"></div>
-        </div>
+
+    <div class="footer">
+        <img src="https://raw.githubusercontent.com/BrBoy/website/main/industria.png" alt="logo" width="40">
+        <span>SoftWare para Indústrias - Sistema de Monitoramento v2.0</span>
     </div>
-    <div id="slider-container">
-        <input type="range" min="0" max="100" value="50" id="slider" oninput="sliderTodesiredLevel()">
-    </div>
-    <div id="controls">
-        <input type="number" id="desiredWaterLevel" placeholder="Litros no tanque (%)"> <!--oninput="updateSlider()"-->
-        <button onclick="setWaterLevel(); updateSlider();">Novo Nivel</button>
-    </div>
+
     <script>
-        var tankHeight = 20; // Height of the physical tank in cm
-        var newLevelCm = 0;
+        // URL da sua nova API
+        const API_URL = '/api/historico';
 
-        function setWaterLevel() {
-            console.log("SET LEVEL CALLED");
-            var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
-            var levelToCm = (desiredLevel / 100) * tankHeight;
-            var newLevelCm = (tankHeight - levelToCm).toFixed(2);
-            console.log(newLevelCm);
-            updateWaterDisplay(newLevelCm);
-            // First, send the level to the levelFromSite endpoint
-            fetch(`/pages/api/levelFromSite.js?level=${encodeURIComponent(newLevelCm)}`)
-                .then(response => {
-                    console.log(encodeURIComponent(newLevelCm));
-                    if (response.ok) {
-                        return response.json();
-                    } else {
-                        throw new Error('Network response was not ok');
-                    }
-                })
-                .then(data => {
-                    var userAgent = navigator.userAgent;
-                    console.log("Level updated:", data.level);
-                    // Then, get the user's IP address and send the log information to the logEndpoint
-                    fetch('https://api.ipify.org?format=json')
-                        .then(response => response.json())
-                        .then(data => {
-                            var userIP = data.ip;
-                            var logUrl = `/pages/api/logsEp.js?level=${encodeURIComponent(newLevelCm)}&userAgent=${encodeURIComponent(userAgent)}&userIP=${encodeURIComponent(userIP)}`;
-
-                            fetch(logUrl)
-                                .then(response => {
-                                    if (response.ok) {
-                                        return response.json();
-                                    } else {
-                                        throw new Error('Network response was not ok');
-                                    }
-                                })
-                                .then(logData => {
-                                    console.log("Log entry created:", logData.message);
-                                })
-                                .catch(error => {
-                                    console.error('Error logging data:', error);
-                                });
-                        })
-                        .catch(error => {
-                            console.error('Error fetching IP address:', error);
-                        });
-            })
-            .catch(error => {
-                console.error('Error sending level data:', error);
-            });
+        async function fetchLogs() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error('Erro ao buscar dados');
+                
+                const data = await response.json();
+                updateTable(data);
+                
+                const now = new Date().toLocaleTimeString();
+                document.getElementById('lastUpdate').innerText = `Última atualização: ${now}`;
+            } catch (error) {
+                console.error('Erro:', error);
+                document.getElementById('logBody').innerHTML = 
+                    '<tr><td colspan="6" style="color:red; text-align:center;">Erro ao carregar dados do banco.</td></tr>';
+            }
         }
 
-
-
-        function updateSlider() {
-            var desiredLevel = parseFloat(document.getElementById('desiredWaterLevel').value);
-            document.getElementById('slider').value = desiredLevel;
-        }
-
-        function sliderTodesiredLevel() {
-            var desiredLevel = parseFloat(document.getElementById('slider').value);
-            document.getElementById('desiredWaterLevel').value = desiredLevel;
-        }
-
-
-
-        //gets level set by board
-        function getLevel() {
-            fetch("/pages/api/levelToSite.js")
-                .then(response => response.json())
-                .then(data => {
-                    const waterLevelCm = parseFloat(data.level);
-                    console.log("WATER LEVEL " + waterLevelCm);
-                    // updateWaterDisplay(waterLevelCm);
-            })
-            .catch(error => console.error("Error fetching data:", error));
-        }
-
-
-        function updateWaterDisplay(waterLevelCm) {
-            if (waterLevelCm > tankHeight) {
-                console.warn("Sensor reading exceeds tank height. Ignoring...");
-                return; // Exit the function early
+        function updateTable(logs) {
+            const body = document.getElementById('logBody');
+            
+            if (logs.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum log encontrado.</td></tr>';
+                return;
             }
 
-            var waterLevelPercentage = ((tankHeight - waterLevelCm) / tankHeight) * 100;
-            //console.log("Water level percentage: " + waterLevelPercentage);
+            body.innerHTML = logs.map(log => {
+                const nivelAtual = parseFloat(log.nivel_atual);
+                const nivelAnterior = log.nivel_anterior ? parseFloat(log.nivel_anterior) : nivelAtual;
+                const diff = (nivelAtual - nivelAnterior).toFixed(2);
+                const diffClass = diff < 0 ? 'diff-negative' : (diff > 0 ? 'diff-positive' : '');
 
-            var tankPixelHeight = 300; // Height of the tank in pixels
-            var waterPixelHeight = (waterLevelPercentage / 100) * tankPixelHeight;
-
-            //console.log("Water pixel height: " + waterPixelHeight);
-            document.getElementById('water').style.height = waterPixelHeight + 'px';
-            console.log(`says it updated water css, tankpx: ${waterPixelHeight} theight: ${tankHeight} levelcm: ${waterLevelCm}`);
+                return `
+                    <tr>
+                        <td><strong>Tanque ${log.id_tanque}</strong></td>
+                        <td>${log.data_placa}</td>
+                        <td style="color: #888;">${log.data_servidor}</td>
+                        <td>${log.nivel_anterior ? log.nivel_anterior + 'L' : '-'}</td>
+                        <td class="level-badge">${log.nivel_atual}L</td>
+                        <td class="${diffClass}">${diff > 0 ? '+' : ''}${diff}L</td>
+                    </tr>
+                `;
+            }).join('');
         }
-        
 
-        //for testing the level display
-        //document.getElementById('water').style.height = 150 + 'px';
-        setInterval(getLevel, 500); // Update every 1 second (adjust as needed)
+        // Inicia a busca e define intervalo de 10 segundos
+        fetchLogs();
+        setInterval(fetchLogs, 10000);
     </script>
-    <div class="logo">
-        <img src="https://raw.githubusercontent.com/BrBoy/website/main/industria.png" alt="logo"  width="100px" height="60px">
-    </div>
-    <div class="rodape" id="rodape">
-        <h5>SoftWare para Industrias</h5>
-    </div>
 </body>
 </html>
