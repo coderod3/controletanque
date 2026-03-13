@@ -1,311 +1,82 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoramento - Controle de Tanque</title>
-    <link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
+    <title>Login</title>
     <style>
-        /* Estilos Globais */
-        :root {
-            --primary-color: #008CBA;
-            --bg-color: #f4f7f6;
-            --text-color: #333;
-            --white: #ffffff;
-            --success-color: #27ae60;
-        }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        header {
-            margin-bottom: 30px;
-            text-align: center;
-        }
-
-        h1 {
-            color: #150857;
-            margin: 0 0 5px 0;
-        }
-
-        .status-badge {
-            background-color: #4CAF50;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-
-        /* Painel de Filtros */
-        .filter-panel {
-            background: #f0f4f7;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 15px;
-            align-items: flex-end;
-            flex-wrap: wrap;
+            font-family: Arial, Helvetica, sans-serif;
+            background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(199, 220, 39));
+            color: aliceblue;
             width: 100%;
-            max-width: 1000px;
-            box-sizing: border-box;
+            height: 100%;
         }
 
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .filter-group label {
-            font-size: 0.8em;
-            font-weight: bold;
-            color: #555;
-        }
-
-        select, input[type="datetime-local"] {
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            font-family: inherit;
-        }
-
-        .btn-export {
-            background-color: var(--success-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.3s;
-        }
-
-        .btn-export:hover {
-            background-color: #219150;
-        }
-
-        /* Container da Tabela */
-        .table-container {
-            width: 100%;
-            max-width: 1000px;
-            background: var(--white);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            overflow-x: auto;
-            box-sizing: border-box;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            background-color: var(--primary-color);
-            color: white;
-            text-align: left;
-            padding: 15px;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 1px;
-        }
-
-        td {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            font-size: 0.95em;
-        }
-
-        tr:hover {
-            background-color: #f9f9f9;
-        }
-
-        .level-badge {
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-
-        .diff-negative { color: #e74c3c; font-weight: bold; }
-        .diff-positive { color: #2ecc71; font-weight: bold; }
-
-        .footer {
-            margin-top: 40px;
-            font-size: 0.8em;
-            color: #888;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .loading {
-            text-align: center;
+        div {
+            background-color: rgba(0, 0, 0, 0.6);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             padding: 40px;
-            font-style: italic;
-            color: #666;
+            border-radius: 15px;
+            color: aliceblue;
+
+        }
+
+        button {
+            background-image: linear-gradient(to right, rgb(39, 66, 241), rgb(72, 105, 243));
+            width: 100%;
+            border: none;
+            padding: 15px;
+            color: aliceblue;
+            font-size: 15px;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+
+        button:hover {
+            background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(12, 12, 230));
+        }
+
+        input {
+            padding: 15px;
+            border: none;
+            outline: none;
+            font-size: 15px;
         }
     </style>
 </head>
+
 <body>
-
-    <header>
-        <h1>Monitoramento Industrial</h1>
-        <span class="status-badge" id="lastUpdate">Iniciando...</span>
-    </header>
-
-    <div class="filter-panel">
-        <div class="filter-group">
-            <label>Intervalo de Dados:</label>
-            <select id="exportRange" onchange="handleFilterChange()">
-                <option value="all">Últimos Registros</option>
-                <option value="1d">Últimas 24 Horas</option>
-                <option value="1w">Última Semana</option>
-                <option value="custom">Personalizado</option>
-            </select>
-        </div>
-
-        <div id="customDates" style="display: none; gap: 10px;">
-            <div class="filter-group">
-                <label>Início:</label>
-                <input type="datetime-local" id="dateStart" onchange="fetchLogs()">
-            </div>
-            <div class="filter-group">
-                <label>Fim:</label>
-                <input type="datetime-local" id="dateEnd" onchange="fetchLogs()">
-            </div>
-        </div>
-
-        <button class="btn-export" onclick="exportarDados()">
-            📥 Exportar CSV para Excel
-        </button>
-    </div>
-
-    <div class="table-container">
-        <table id="logTable">
-            <thead>
-                <tr>
-                    <th>Tanque</th>
-                    <th>Data (Placa)</th>
-                    <th>Data (Servidor)</th>
-                    <th>Nível Anterior</th>
-                    <th>Nível Atual</th>
-                    <th>Variação</th>
-                </tr>
-            </thead>
-            <tbody id="logBody">
-                <tr>
-                    <td colspan="6" class="loading">Conectando ao banco de dados...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="footer">
-        <img src="https://raw.githubusercontent.com/BrBoy/website/main/industria.png" alt="logo" width="40">
-        <span>SoftWare para Indústrias - Sistema de Monitoramento v2.0</span>
+    <div class="tela_login">
+        <h1>Login</h1>
+        <input type="text" placeholder="Login" id="Login">
+        <br><br>
+        <input type="password" placeholder="Senha" id="Senha">
+        <br><br>
+        <button onclick="logar()">Enviar</button>
     </div>
 
     <script>
-        const API_URL = '/pages/api/historico.js';
+        function logar() {
 
-        // Lida com a mudança no seletor de intervalo
-        function handleFilterChange() {
-            const range = document.getElementById('exportRange').value;
-            document.getElementById('customDates').style.display = range === 'custom' ? 'flex' : 'none';
-            fetchLogs();
-        }
+            var login = document.getElementById('Login').value;
+            var senha = document.getElementById('Senha').value;
 
-        // Busca logs para a tabela aplicando os filtros atuais
-        async function fetchLogs() {
-            const range = document.getElementById('exportRange').value;
-            let url = `${API_URL}?intervalo=${range}`;
-
-            if (range === 'custom') {
-                const inicio = document.getElementById('dateStart').value;
-                const fim = document.getElementById('dateEnd').value;
-                if (inicio && fim) {
-                    url += `&inicio=${inicio}&fim=${fim}`;
-                }
+            if (login == "admin" && senha == "admin") {
+                location.href = "dashboard.html";
+            } else {
+                alert('Usuário ou senha incorretos');
             }
 
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Falha na comunicação');
-                
-                const data = await response.json();
-                updateTable(data);
-                
-                const now = new Date().toLocaleTimeString();
-                document.getElementById('lastUpdate').innerText = `Sincronizado: ${now}`;
-            } catch (error) {
-                console.error('Erro:', error);
-                document.getElementById('logBody').innerHTML = 
-                    '<tr><td colspan="6" style="color:red; text-align:center;">Erro ao carregar dados. Verifique a conexão.</td></tr>';
-            }
+
+
         }
-
-        // Renderiza as linhas da tabela
-        function updateTable(logs) {
-            const body = document.getElementById('logBody');
-            
-            if (!logs || logs.length === 0) {
-                body.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum registro encontrado no período selecionado.</td></tr>';
-                return;
-            }
-
-            body.innerHTML = logs.map(log => {
-                const atual = parseFloat(log.nivel_atual);
-                const anterior = log.nivel_anterior !== null ? parseFloat(log.nivel_anterior) : atual;
-                const diff = (atual - anterior).toFixed(2);
-                const diffClass = diff < 0 ? 'diff-negative' : (diff > 0 ? 'diff-positive' : '');
-                const diffSymbol = diff > 0 ? '+' : '';
-
-                return `
-                    <tr>
-                        <td><strong>Tanque ${log.id_tanque}</strong></td>
-                        <td>${log.data_placa}</td>
-                        <td style="color: #888;">${log.data_servidor}</td>
-                        <td>${log.nivel_anterior !== null ? log.nivel_anterior + ' L' : '-'}</td>
-                        <td class="level-badge">${log.nivel_atual} L</td>
-                        <td class="${diffClass}">${diffSymbol}${diff} L</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        // Exporta o arquivo CSV usando os mesmos filtros da tabela
-        function exportarDados() {
-            const range = document.getElementById('exportRange').value;
-            let url = `${API_URL}?format=csv&intervalo=${range}`;
-
-            if (range === 'custom') {
-                const inicio = document.getElementById('dateStart').value;
-                const fim = document.getElementById('dateEnd').value;
-                if (!inicio || !fim) {
-                    alert("Por favor, preencha as datas de início e fim para exportar.");
-                    return;
-                }
-                url += `&inicio=${inicio}&fim=${fim}`;
-            }
-
-            // Inicia o download via browser
-            window.location.href = url;
-        }
-
-        // Inicialização e Atualização Automática
-        fetchLogs();
-        setInterval(fetchLogs, 10000); // Atualiza a cada 10 segundos
     </script>
+
 </body>
+
 </html>
