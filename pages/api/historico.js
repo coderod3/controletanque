@@ -48,14 +48,14 @@ export default async function handler(req, res) {
     // Se não houver parâmetros de inserção, retorna os últimos 50 registros
     const selectQuery = `
       SELECT id, id_tanque, 
-             TO_CHAR(data_hora_placa, 'DD/MM/YYYY HH24:MI:SS') as data_placa, 
-             TO_CHAR(data_hora_servidor, 'DD/MM/YYYY HH24:MI:SS') as data_servidor,
-             nivel_anterior, nivel_atual 
+            TO_CHAR(data_hora_placa, 'DD/MM/YYYY HH24:MI:SS') as data_placa, 
+            -- Converte de UTC para o fuso de São Paulo/Brasília
+            TO_CHAR(data_hora_servidor AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS') as data_servidor,
+            nivel_anterior, nivel_atual 
       FROM historico_tanques 
-      ORDER BY data_hora_servidor DESC 
+      ORDER BY id DESC 
       LIMIT 50
     `;
-    
     const result = await client.query(selectQuery);
     res.status(200).json(result.rows);
 
