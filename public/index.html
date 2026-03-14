@@ -1,80 +1,194 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Login - Monitoramento de Tanques</title>
+    <link rel="icon" type="image/png" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png">
+    
     <style>
-        body {
-            font-family: Arial, Helvetica, sans-serif;
-            background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(199, 220, 39));
-            color: aliceblue;
+        :root {
+            --ua-blue: rgb(72, 105, 243);
+            --ua-lime: rgb(199, 220, 39);
+            --text-dark: #1e293b;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
             width: 100%;
             height: 100%;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, var(--ua-blue) 0%, var(--ua-lime) 100%);
+            background-attachment: fixed;
+            overflow: hidden; /* Mantém a página limpa sem scroll */
         }
 
-        div {
-            background-color: rgba(0, 0, 0, 0.6);
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 40px;
-            border-radius: 15px;
-            color: aliceblue;
-
-        }
-
-        button {
-            background-image: linear-gradient(to right, rgb(39, 66, 241), rgb(72, 105, 243));
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             width: 100%;
-            border: none;
-            padding: 15px;
-            color: aliceblue;
-            font-size: 15px;
-            cursor: pointer;
-            border-radius: 10px;
+            max-width: 400px;
+            padding: 20px;
+            /* Deslocamento para cima para centralização visual perfeita */
+            transform: translateY(-80px);
+            z-index: 2;
         }
 
-        button:hover {
-            background-image: linear-gradient(to right, rgb(72, 105, 243), rgb(12, 12, 230));
+        .brand-logo {
+            width: 120px;
+            margin-bottom: 30px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+
+        .login-card {
+            background: #ffffff; 
+            width: 100%;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
+        }
+
+        h2 {
+            color: var(--text-dark);
+            font-size: 1.5rem;
+            margin: 0 0 25px 0;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 8px;
         }
 
         input {
-            padding: 15px;
-            border: none;
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
             outline: none;
-            font-size: 15px;
+        }
+
+        input:focus {
+            border-color: var(--ua-blue);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--ua-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #3656d1;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .helper-links {
+            margin-top: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .helper-links a {
+            color: var(--ua-blue);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .helper-links a:hover {
+            text-decoration: underline;
+        }
+
+        /* Rodapé fixo no fundo da tela */
+        .system-footer {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 1;
         }
     </style>
 </head>
-
 <body>
-    <div class="tela_login">
-        <h1>Login</h1>
-        <input type="text" placeholder="Login" id="Login">
-        <br><br>
-        <input type="password" placeholder="Senha" id="Senha">
-        <br><br>
-        <button onclick="logar()">Enviar</button>
+
+    <div class="login-container">
+        <img src="https://unaerp.br/wp-content/uploads/2025/07/logo-unaerp-vertical.png" alt="Unaerp" class="brand-logo">
+
+        <div class="login-card">
+            <h2>Acesso ao Sistema</h2>
+            
+            <div class="input-group">
+                <label for="Login">Usuário</label>
+                <input type="text" id="Login" placeholder="Digite seu usuário">
+            </div>
+            
+            <div class="input-group">
+                <label for="Senha">Senha</label>
+                <input type="password" id="Senha" placeholder="••••••••">
+            </div>
+
+            <button onclick="logar()">Entrar no Painel</button>
+
+            <div class="helper-links">
+                <a href="#">Esqueci minha senha</a>
+                <a href="#">Solicitar novo cadastro</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="system-footer">
+        Engenharia de software • Unaerp
     </div>
 
     <script>
         function logar() {
+            const login = document.getElementById('Login').value;
+            const senha = document.getElementById('Senha').value;
 
-            var login = document.getElementById('Login').value;
-            var senha = document.getElementById('Senha').value;
-
-            if (login == "admin" && senha == "admin") {
+            if (login === "admin" && senha === "admin") {
                 location.href = "dashboard.html";
             } else {
-                alert('Usuário ou senha incorretos');
+                alert('Usuário ou senha incorretos.');
             }
-
         }
     </script>
 
 </body>
-
 </html>
