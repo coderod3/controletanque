@@ -8,7 +8,8 @@ const pool = new Pool({
 
 export default async function handler(req, res) {
   const client = await pool.connect();
-  const { id_tanque, nivel, data_placa, intervalo, inicio, fim, format } = req.query;
+  const { id_tanque, nivel, data_placa, intervalo, inicio, fim, format, ordem } = req.query;
+  const direcao = ordem === 'asc' ? 'ASC' : 'DESC';
 
   try {
     // --- LÓGICA DE INSERÇÃO (Arduino/ESP32) ---
@@ -41,12 +42,13 @@ export default async function handler(req, res) {
 
     const selectQuery = `
       SELECT id_tanque, 
-             TO_CHAR(data_hora_placa, 'DD/MM/YYYY HH24:MI:SS') as data_placa, 
-             TO_CHAR(data_hora_servidor AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS') as data_servidor,
-             nivel_anterior, nivel_atual 
+            TO_CHAR(data_hora_placa, 'DD/MM/YYYY HH24:MI:SS') as data_placa, 
+            TO_CHAR(data_hora_servidor AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS') as data_servidor,
+            nivel_anterior, nivel_atual 
       FROM historico_tanques 
       ${queryFiltro}
-      ORDER BY id DESC LIMIT 100
+      ORDER BY data_hora_placa ${direcao} -- Ordenação correta aqui
+      LIMIT 500
     `;
 
     const result = await client.query(selectQuery, params);

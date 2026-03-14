@@ -165,6 +165,7 @@
     </header>
 
     <div class="filter-panel">
+
         <div class="filter-group">
             <label>Intervalo de Dados:</label>
             <select id="exportRange" onchange="handleFilterChange()">
@@ -189,6 +190,15 @@
         <button class="btn-export" onclick="exportarDados()">
             📥 Exportar CSV para Excel
         </button>
+
+        <div class="filter-group">
+            <label>Ordem:</label>
+            <select id="sortOrder" onchange="fetchLogs()">
+                <option value="desc">Mais Recentes Primeiro</option>
+                <option value="asc">Mais Antigos Primeiro</option>
+            </select>
+        </div>
+
     </div>
 
     <div class="table-container">
@@ -229,8 +239,9 @@
         // Busca logs para a tabela aplicando os filtros atuais
         async function fetchLogs() {
             const range = document.getElementById('exportRange').value;
-            let url = `${API_URL}?intervalo=${range}`;
-
+            const ordem = document.getElementById('sortOrder').value; // Pega a ordem
+            let url = `${API_URL}?intervalo=${range}&ordem=${ordem}`;
+            
             if (range === 'custom') {
                 const inicio = document.getElementById('dateStart').value;
                 const fim = document.getElementById('dateEnd').value;
@@ -287,8 +298,9 @@
         // Exporta o arquivo CSV usando os mesmos filtros da tabela
         function exportarDados() {
             const range = document.getElementById('exportRange').value;
-            let url = `${API_URL}?format=csv&intervalo=${range}`;
-
+            const ordem = document.getElementById('sortOrder').value;
+            let url = `${API_URL}?format=csv&intervalo=${range}&ordem=${ordem}`;
+            
             if (range === 'custom') {
                 const inicio = document.getElementById('dateStart').value;
                 const fim = document.getElementById('dateEnd').value;
