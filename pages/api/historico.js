@@ -27,18 +27,28 @@ export default async function handler(req, res) {
       return res.status(201).json({ message: "Log criado" });
     }
 
-    // --- LÓGICA DE CONSULTA E FILTRO ---
-    let queryFiltro = "";
+    // --- LÓGICA DE CONSULTA E FILTRO (CORRIGIDA) ---
+    let filtros = [];
     const params = [];
 
+    // 1. Filtro por ID do Tanque (Se não for "all")
+    if (id_tanque && id_tanque !== 'all') {
+      filtros.push(`id_tanque = $${params.length + 1}`);
+      params.push(parseInt(id_tanque));
+    }
+
+    // 2. Filtro por Intervalo de Tempo
     if (intervalo === '1d') {
-      queryFiltro = "WHERE data_hora_servidor > NOW() - INTERVAL '1 day'";
+      filtros.push("data_hora_servidor > NOW() - INTERVAL '1 day'");
     } else if (intervalo === '1w') {
-      queryFiltro = "WHERE data_hora_servidor > NOW() - INTERVAL '7 days'";
+      filtros.push("data_hora_servidor > NOW() - INTERVAL '7 days'");
     } else if (intervalo === 'custom' && inicio && fim) {
-      queryFiltro = "WHERE data_hora_servidor BETWEEN $1 AND $2";
+      filtros.push(`data_hora_servidor BETWEEN $${params.length + 1} AND $${params.length + 2}`);
       params.push(inicio, fim);
     }
+
+    // Constrói a cláusula WHERE dinamicamente
+    const queryFiltro = filtros.length > 0 ? `WHERE ${filtros.join(' AND ')}` : "";
 
     const selectQuery = `
       SELECT id_tanque, 
@@ -47,7 +57,7 @@ export default async function handler(req, res) {
             nivel_anterior, nivel_atual 
       FROM historico_tanques 
       ${queryFiltro}
-      ORDER BY data_hora_placa ${direcao} -- Ordenação correta aqui
+      ORDER BY data_hora_placa ${direcao}
       LIMIT 500
     `;
 

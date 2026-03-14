@@ -216,17 +216,17 @@
                 <div class="field">
                     <label>Unidade / Tanque</label>
                     <select id="tankSelect" onchange="fetchLogs()">
-                        <option value="all">Todos os ativos</option>
-                        <option value="1">Reservatório 01</option>
-                        <option value="2">Reservatório 02</option>
-                        <option value="3">Reservatório 03</option>
+                        <option value="all">Todos</option>
+                        <option value="1">Tanque 01</option>
+                        <option value="2">Tanque 02</option>
+                        <option value="3">Tanque 03</option>
                     </select>
                 </div>
 
                 <div class="field">
                     <label>Período de Análise</label>
                     <select id="exportRange" onchange="handleFilterChange()">
-                        <option value="all">Histórico Recente</option>
+                        <option value="all">Todos</option>
                         <option value="1d">Últimas 24 Horas</option>
                         <option value="1w">Últimos 7 Dias</option>
                         <option value="custom">Intervalo Customizado</option>
@@ -247,8 +247,8 @@
                 <div class="field">
                     <label>Ordenação</label>
                     <select id="sortOrder" onchange="fetchLogs()">
-                        <option value="desc">Cronológica (Desc)</option>
-                        <option value="asc">Cronológica (Asc)</option>
+                        <option value="desc">Mais novos</option>
+                        <option value="asc">Mais antigos</option>
                     </select>
                 </div>
             </div>
