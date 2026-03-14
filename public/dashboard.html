@@ -3,275 +3,324 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoramento - Controle de Tanque</title>
+    <title>Sistema de Monitoramento - UNAERP</title>
     <link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
     <style>
-        /* Estilos Globais */
         :root {
-            --primary-color: #008CBA;
-            --bg-color: #f4f7f6;
-            --text-color: #333;
-            --white: #ffffff;
-            --success-color: #27ae60;
+            --ua-blue: #1e3a8a; /* Azul mais escuro e sóbrio */
+            --ua-lime: #a3e635;
+            --bg-light: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
             margin: 0;
+            padding: 0;
+            background-color: var(--bg-light);
+            /* Degradê apenas como um detalhe de iluminação no fundo */
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(72, 105, 243, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(199, 220, 39, 0.05) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* Barra Superior Executiva */
+        .top-nav {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--ua-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .dot {
+            height: 8px;
+            width: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        /* Painel de Controle Sóbrio */
+        .control-panel {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             padding: 20px;
             display: flex;
-            flex-direction: column;
+            justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 25px;
         }
 
-        header {
-            margin-bottom: 30px;
-            text-align: center;
-        }
-
-        h1 {
-            color: #150857;
-            margin: 0 0 5px 0;
-        }
-
-        .status-badge {
-            background-color: #4CAF50;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-
-        /* Painel de Filtros */
-        .filter-panel {
-            background: #f0f4f7;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+        .filters-group {
             display: flex;
             gap: 15px;
-            align-items: flex-end;
             flex-wrap: wrap;
-            width: 100%;
-            max-width: 1000px;
-            box-sizing: border-box;
         }
 
-        .filter-group {
+        .field {
             display: flex;
             flex-direction: column;
             gap: 5px;
         }
 
-        .filter-group label {
-            font-size: 0.8em;
-            font-weight: bold;
-            color: #555;
+        .field label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
         }
 
-        select, input[type="datetime-local"] {
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            font-family: inherit;
+        select, input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            outline: none;
+            background: #ffffff;
         }
 
-        .btn-export {
-            background-color: var(--success-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+        .actions-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
-            font-weight: bold;
-            transition: background 0.3s;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
         }
 
-        .btn-export:hover {
-            background-color: #219150;
-        }
+        .btn-primary { background: var(--ua-blue); color: white; border: none; }
+        .btn-secondary { background: white; color: var(--text-main); }
+        .btn:hover { opacity: 0.9; }
 
-        /* Container da Tabela */
-        .table-container {
-            width: 100%;
-            max-width: 1000px;
-            background: var(--white);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            overflow-x: auto;
-            box-sizing: border-box;
+        /* Tabela Estilo Enterprise */
+        .data-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
+            text-align: left;
         }
 
         th {
-            background-color: var(--primary-color);
-            color: white;
-            text-align: left;
-            padding: 15px;
-            font-weight: 600;
+            background: #f8fafc;
+            padding: 12px 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
             text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border-color);
         }
 
         td {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            font-size: 0.95em;
+            padding: 14px 20px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f1f5f9;
         }
 
-        tr:hover {
-            background-color: #f9f9f9;
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #fdfdfd; }
+
+        .badge-level {
+            font-family: 'Roboto Mono', monospace;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
         }
 
-        .level-badge {
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-
-        .diff-negative { color: #e74c3c; font-weight: bold; }
-        .diff-positive { color: #2ecc71; font-weight: bold; }
+        .trend-up { color: #15803d; }
+        .trend-down { color: #b91c1c; }
 
         .footer {
-            margin-top: 40px;
-            font-size: 0.8em;
-            color: #888;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .loading {
+            margin-top: 50px;
+            padding-bottom: 30px;
             text-align: center;
-            padding: 40px;
-            font-style: italic;
-            color: #666;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Monitoramento Industrial</h1>
-        <span class="status-badge" id="lastUpdate">Iniciando...</span>
-    </header>
-
-    <div class="filter-panel">
-
-        <div class="filter-group">
-            <label>Intervalo de Dados:</label>
-            <select id="exportRange" onchange="handleFilterChange()">
-                <option value="all">Últimos Registros</option>
-                <option value="1d">Últimas 24 Horas</option>
-                <option value="1w">Última Semana</option>
-                <option value="custom">Personalizado</option>
-            </select>
+    <nav class="top-nav">
+        <div class="brand">
+            <img src="https://unaerp.br/wp-content/uploads/2025/07/logo-unaerp-vertical.png" height="40" alt="UNAERP">
+            <h1>Gestão de Reservatórios</h1>
         </div>
+        <div class="status-indicator">
+            <span class="dot"></span>
+            SISTEMA OPERACIONAL • <span id="lastUpdate">CARREGANDO...</span>
+        </div>
+    </nav>
 
-        <div id="customDates" style="display: none; gap: 10px;">
-            <div class="filter-group">
-                <label>Início:</label>
-                <input type="datetime-local" id="dateStart" onchange="fetchLogs()">
+    <main class="main-content">
+        <div class="control-panel">
+            <div class="filters-group">
+                <div class="field">
+                    <label>Unidade / Tanque</label>
+                    <select id="tankSelect" onchange="fetchLogs()">
+                        <option value="all">Todos os ativos</option>
+                        <option value="1">Reservatório 01</option>
+                        <option value="2">Reservatório 02</option>
+                        <option value="3">Reservatório 03</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>Período de Análise</label>
+                    <select id="exportRange" onchange="handleFilterChange()">
+                        <option value="all">Histórico Recente</option>
+                        <option value="1d">Últimas 24 Horas</option>
+                        <option value="1w">Últimos 7 Dias</option>
+                        <option value="custom">Intervalo Customizado</option>
+                    </select>
+                </div>
+
+                <div id="customDates" style="display: none; gap: 10px;">
+                    <div class="field">
+                        <label>Início</label>
+                        <input type="datetime-local" id="dateStart" onchange="fetchLogs()">
+                    </div>
+                    <div class="field">
+                        <label>Fim</label>
+                        <input type="datetime-local" id="dateEnd" onchange="fetchLogs()">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Ordenação</label>
+                    <select id="sortOrder" onchange="fetchLogs()">
+                        <option value="desc">Cronológica (Desc)</option>
+                        <option value="asc">Cronológica (Asc)</option>
+                    </select>
+                </div>
             </div>
-            <div class="filter-group">
-                <label>Fim:</label>
-                <input type="datetime-local" id="dateEnd" onchange="fetchLogs()">
+
+            <div class="actions-group">
+                <button class="btn btn-secondary" onclick="exportarDados()">Exportar Relatório</button>
+                <button class="btn btn-primary" onclick="location.href='metrics.html'">Métricas Avançadas</button>
             </div>
         </div>
 
-        <button class="btn-export" onclick="exportarDados()">
-            📥 Exportar CSV para Excel
-        </button>
-
-        <div class="filter-group">
-            <label>Ordem:</label>
-            <select id="sortOrder" onchange="fetchLogs()">
-                <option value="desc">Mais Recentes Primeiro</option>
-                <option value="asc">Mais Antigos Primeiro</option>
-            </select>
+        <div class="data-card">
+            <table id="logTable">
+                <thead>
+                    <tr>
+                        <th>Identificador</th>
+                        <th>Data Registro (Placa)</th>
+                        <th>Sincronização (Servidor)</th>
+                        <th>Nível Anterior</th>
+                        <th>Nível Atual</th>
+                        <th>Variação Líquida</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding: 40px;">Buscando registros...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+    </main>
 
-    </div>
-
-    <div class="table-container">
-        <table id="logTable">
-            <thead>
-                <tr>
-                    <th>Tanque</th>
-                    <th>Data (Placa)</th>
-                    <th>Data (Servidor)</th>
-                    <th>Nível Anterior</th>
-                    <th>Nível Atual</th>
-                    <th>Variação</th>
-                </tr>
-            </thead>
-            <tbody id="logBody">
-                <tr>
-                    <td colspan="6" class="loading">Conectando ao banco de dados...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="footer">
-        <img src="https://raw.githubusercontent.com/BrBoy/website/main/industria.png" alt="logo" width="40">
-        <span>SoftWare para Indústrias - Sistema de Monitoramento v2.0</span>
-    </div>
+    <footer class="footer">
+        UNAERP • Engenharia de Software • Campus Ribeirão Preto • 2026
+    </footer>
 
     <script>
         const API_URL = '/pages/api/historico.js';
 
-        // Lida com a mudança no seletor de intervalo
         function handleFilterChange() {
             const range = document.getElementById('exportRange').value;
             document.getElementById('customDates').style.display = range === 'custom' ? 'flex' : 'none';
             fetchLogs();
         }
 
-        // Busca logs para a tabela aplicando os filtros atuais
         async function fetchLogs() {
             const range = document.getElementById('exportRange').value;
-            const ordem = document.getElementById('sortOrder').value; // Pega a ordem
-            let url = `${API_URL}?intervalo=${range}&ordem=${ordem}`;
+            const ordem = document.getElementById('sortOrder').value;
+            const tanque = document.getElementById('tankSelect').value;
+            
+            let url = `${API_URL}?intervalo=${range}&ordem=${ordem}&id_tanque=${tanque}`;
             
             if (range === 'custom') {
                 const inicio = document.getElementById('dateStart').value;
                 const fim = document.getElementById('dateEnd').value;
-                if (inicio && fim) {
-                    url += `&inicio=${inicio}&fim=${fim}`;
-                }
+                if (inicio && fim) url += `&inicio=${inicio}&fim=${fim}`;
             }
 
             try {
                 const response = await fetch(url);
-                if (!response.ok) throw new Error('Falha na comunicação');
-                
                 const data = await response.json();
                 updateTable(data);
-                
-                const now = new Date().toLocaleTimeString();
-                document.getElementById('lastUpdate').innerText = `Sincronizado: ${now}`;
+                document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
             } catch (error) {
                 console.error('Erro:', error);
-                document.getElementById('logBody').innerHTML = 
-                    '<tr><td colspan="6" style="color:red; text-align:center;">Erro ao carregar dados. Verifique a conexão.</td></tr>';
+                document.getElementById('logBody').innerHTML = '<tr><td colspan="6" style="color:red; text-align:center;">Falha na conexão com o banco de dados.</td></tr>';
             }
         }
 
-        // Renderiza as linhas da tabela
         function updateTable(logs) {
             const body = document.getElementById('logBody');
-            
             if (!logs || logs.length === 0) {
-                body.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum registro encontrado no período selecionado.</td></tr>';
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px;">Sem registros para o filtro selecionado.</td></tr>';
                 return;
             }
 
@@ -279,45 +328,38 @@
                 const atual = parseFloat(log.nivel_atual);
                 const anterior = log.nivel_anterior !== null ? parseFloat(log.nivel_anterior) : atual;
                 const diff = (atual - anterior).toFixed(2);
-                const diffClass = diff < 0 ? 'diff-negative' : (diff > 0 ? 'diff-positive' : '');
-                const diffSymbol = diff > 0 ? '+' : '';
-
+                const diffClass = diff < 0 ? 'trend-down' : (diff > 0 ? 'trend-up' : '');
+                
                 return `
                     <tr>
-                        <td><strong>Tanque ${log.id_tanque}</strong></td>
+                        <td><strong>Tanque 0${log.id_tanque}</strong></td>
                         <td>${log.data_placa}</td>
-                        <td style="color: #888;">${log.data_servidor}</td>
+                        <td style="color: var(--text-muted); font-size: 0.8rem;">${log.data_servidor}</td>
                         <td>${log.nivel_anterior !== null ? log.nivel_anterior + ' L' : '-'}</td>
-                        <td class="level-badge">${log.nivel_atual} L</td>
-                        <td class="${diffClass}">${diffSymbol}${diff} L</td>
+                        <td><span class="badge-level">${log.nivel_atual} L</span></td>
+                        <td class="${diffClass}">${diff > 0 ? '+' : ''}${diff} L</td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // Exporta o arquivo CSV usando os mesmos filtros da tabela
         function exportarDados() {
             const range = document.getElementById('exportRange').value;
             const ordem = document.getElementById('sortOrder').value;
-            let url = `${API_URL}?format=csv&intervalo=${range}&ordem=${ordem}`;
+            const tanque = document.getElementById('tankSelect').value;
+            let url = `${API_URL}?format=csv&intervalo=${range}&ordem=${ordem}&id_tanque=${tanque}`;
             
             if (range === 'custom') {
                 const inicio = document.getElementById('dateStart').value;
                 const fim = document.getElementById('dateEnd').value;
-                if (!inicio || !fim) {
-                    alert("Por favor, preencha as datas de início e fim para exportar.");
-                    return;
-                }
+                if (!inicio || !fim) return alert("Selecione o intervalo.");
                 url += `&inicio=${inicio}&fim=${fim}`;
             }
-
-            // Inicia o download via browser
             window.location.href = url;
         }
 
-        // Inicialização e Atualização Automática
         fetchLogs();
-        setInterval(fetchLogs, 10000); // Atualiza a cada 10 segundos
+        setInterval(fetchLogs, 15000); // Frequência de atualização levemente reduzida para 15s
     </script>
 </body>
 </html>
