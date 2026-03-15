@@ -52,8 +52,8 @@ export default async function handler(req, res) {
 
     const selectQuery = `
       SELECT id_tanque, 
-            TO_CHAR(data_hora_placa, 'DD/MM/YYYY HH24:MI:SS') as data_placa, 
-            TO_CHAR(data_hora_servidor AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS') as data_servidor,
+            TO_CHAR(data_hora_placa, 'DD/MM/YYYY HH24:MI:SS.MS') as data_placa, 
+            TO_CHAR(data_hora_servidor AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS.MS') as data_servidor,
             nivel_anterior, nivel_atual 
       FROM historico_tanques 
       ${queryFiltro}

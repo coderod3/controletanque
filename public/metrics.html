@@ -109,7 +109,7 @@
             <img src="https://unaerp.br/wp-content/uploads/2025/07/logo-unaerp-vertical.png" height="40">
             <h1 style="font-size: 1.1rem; margin: 0; text-transform: uppercase;">Análise de Métricas</h1>
         </div>
-        <button class="btn-back" onclick="location.href='dashboard.html'">← Voltar ao Monitoramento</button>
+        <button class="btn-back" onclick="location.href='dashboard.html'">Voltar ao Monitoramento</button>
     </nav>
 
     <main class="main-content">
@@ -184,10 +184,14 @@
         }
 
         function parseDate(str) {
-            const [d, m, y, h, min, s] = str.split(/[/ :]/);
-            return new Date(y, m - 1, d, h, min, s);
+            // Agora o split considera espaço, dois pontos, barra e ponto final
+            const parts = str.split(/[/ :.]/);
+            const [d, m, y, h, min, s, ms] = parts;
+            
+            // Retorna o objeto Date com milissegundos inclusos
+            return new Date(y, m - 1, d, h, min, s, ms || 0);
         }
-
+        
         function processMetrics(logs) {
             let consumo = 0;
             let abastecimento = 0;
