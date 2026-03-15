@@ -50,9 +50,11 @@ export default async function handler(req, res) {
     // Constrói a cláusula WHERE dinamicamente
     const queryFiltro = filtros.length > 0 ? `WHERE ${filtros.join(' AND ')}` : "";
 
+    // pages/api/historico.js
     const selectQuery = `
       SELECT id_tanque, 
-            TO_CHAR(data_hora_placa, 'DD/MM/YYYY HH24:MI:SS.MS') as data_placa, 
+            -- Agora tratamos a data da placa com o mesmo fuso do servidor
+            TO_CHAR(data_hora_placa AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS.MS') as data_placa, 
             TO_CHAR(data_hora_servidor AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS.MS') as data_servidor,
             nivel_anterior, nivel_atual 
       FROM historico_tanques 

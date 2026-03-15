@@ -184,14 +184,16 @@
         }
 
         function parseDate(str) {
-            // Agora o split considera espaço, dois pontos, barra e ponto final
+            // Quebra a string: "15/03/2026 10:00:00.045"
             const parts = str.split(/[/ :.]/);
             const [d, m, y, h, min, s, ms] = parts;
             
-            // Retorna o objeto Date com milissegundos inclusos
-            return new Date(y, m - 1, d, h, min, s, ms || 0);
+            // Criamos a data usando Date.UTC para evitar que o navegador aplique fuso local
+            // e estrague o cálculo de delay
+            const timestamp = Date.UTC(y, m - 1, d, h, min, s, ms || 0);
+            return new Date(timestamp);
         }
-        
+
         function processMetrics(logs) {
             let consumo = 0;
             let abastecimento = 0;
