@@ -106,9 +106,12 @@
 
     <nav class="top-nav">
         <div style="display: flex; align-items: center; gap: 15px;">
-            <img src="https://unaerp.br/wp-content/uploads/2025/07/logo-unaerp-vertical.png" height="40">
+            <a href="dashboard.html">
+                <img src="https://unaerp.br/wp-content/uploads/2025/07/logo-unaerp-vertical.png" height="40">
+            </a>
             <h1 style="font-size: 1.1rem; margin: 0; text-transform: uppercase;">Análise de Métricas</h1>
         </div>
+
         <button class="btn-back" onclick="location.href='dashboard.html'">Voltar ao Monitoramento</button>
     </nav>
 
@@ -129,9 +132,24 @@
                     <option value="all">Todo Histórico</option>
                     <option value="1d">24 Horas</option>
                     <option value="1w">7 Dias</option>
+                    <option value="custom">Personalizado</option>
                 </select>
             </div>
-            <div id="statusUpdate" style="font-size: 0.7rem; color: #94a3b8;">Sincronizando...</div>
+
+            <div id="customDates" style="display: none; gap: 10px;">
+                <div class="field">
+                    <label>Início</label>
+                    <input type="datetime-local" id="dateStart" onchange="fetchData()">
+                </div>
+                <div class="field">
+                    <label>Fim</label>
+                    <input type="datetime-local" id="dateEnd" onchange="fetchData()">
+                </div>
+            </div>
+
+            <div style="flex-grow: 1;"></div> <button class="btn-back" style="background-color: #1e3a8a;" onclick="exportarMetricas()">
+                Exportar Relatório
+            </button>
         </div>
 
         <div class="metrics-grid">
@@ -168,12 +186,42 @@
         const API_URL = '/pages/api/historico.js';
         let charts = {};
 
-        function handleFilterChange() { fetchData(); }
+
+        function verificarSessao() {
+            const loginTimestamp = localStorage.getItem('loginTimestamp');
+            const cincoMinutos = 10 * 60 * 1000; // 5 min em milissegundos
+            const agora = new Date().getTime();
+
+            // Se não houver data de login ou se a diferença for maior que 5 min
+            if (!loginTimestamp || (agora - loginTimestamp > cincoMinutos)) {
+                localStorage.removeItem('loginTimestamp'); // Limpa o que sobrou
+                alert("Sua sessão expirou (limite de 5 minutos). Faça login novamente.");
+                window.location.href = "index.html";
+            }
+        }
+
+        // Executa assim que a página abre
+        verificarSessao();
+
+        // Opcional: Verifica a cada 30 segundos se o tempo acabou enquanto ele olha a tela
+        setInterval(verificarSessao, 30000);
+
+        function handleFilterChange() {
+            const range = document.getElementById('exportRange').value;
+            document.getElementById('customDates').style.display = range === 'custom' ? 'flex' : 'none';
+            fetchData();
+        }
 
         async function fetchData() {
             const range = document.getElementById('exportRange').value;
             const tanque = document.getElementById('tankSelect').value;
             let url = `${API_URL}?intervalo=${range}&id_tanque=${tanque}&ordem=asc`;
+
+            if (range === 'custom') {
+                const inicio = document.getElementById('dateStart').value;
+                const fim = document.getElementById('dateEnd').value;
+                if (inicio && fim) url += `&inicio=${inicio}&fim=${fim}`;
+            }
 
             try {
                 const response = await fetch(url);
@@ -181,6 +229,21 @@
                 processMetrics(data);
                 document.getElementById('statusUpdate').innerText = `Atualizado às ${new Date().toLocaleTimeString()}`;
             } catch (e) { console.error(e); }
+        }
+
+        // Função para exportar os mesmos dados filtrados
+        function exportarMetricas() {
+            const range = document.getElementById('exportRange').value;
+            const tanque = document.getElementById('tankSelect').value;
+            let url = `${API_URL}?format=csv&intervalo=${range}&id_tanque=${tanque}&ordem=asc`;
+
+            if (range === 'custom') {
+                const inicio = document.getElementById('dateStart').value;
+                const fim = document.getElementById('dateEnd').value;
+                if (!inicio || !fim) return alert("Selecione o período completo!");
+                url += `&inicio=${inicio}&fim=${fim}`;
+            }
+            window.location.href = url;
         }
 
         function parseDate(str) {

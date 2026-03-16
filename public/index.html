@@ -167,14 +167,19 @@
             <button onclick="logar()">Entrar no Painel</button>
 
             <div class="helper-links">
-                <a href="#">Esqueci minha senha</a>
-                <a href="#">Solicitar novo cadastro</a>
+                <a href="mailto:suporte.controletanque@gmail.com?subject=Recuperar%20senha&body=Olá,%20esqueci%20minha%20senha.%20Poderiam%20me%20ajudar?">
+                    Esqueci minha senha
+                </a>
+                <a href="mailto:suporte.controletanque@gmail.com?subject=Novo%20cadastro&body=Olá,%20gostaria%20de%20solicitar%20um%20novo%20cadastro.">
+                    Solicitar novo cadastro
+                </a>
             </div>
+
         </div>
     </div>
 
     <div class="system-footer">
-        Engenharia de software • Unaerp
+        Controle de Tanque • Indústria 4.0
     </div>
 
     <script>
@@ -183,6 +188,10 @@
             const senha = document.getElementById('Senha').value;
 
             if (login === "admin" && senha === "admin") {
+                // Guarda o horário atual em milissegundos
+                const tempoAtual = new Date().getTime();
+                localStorage.setItem('loginTimestamp', tempoAtual);
+                
                 location.href = "dashboard.html";
             } else {
                 alert('Usuário ou senha incorretos.');
