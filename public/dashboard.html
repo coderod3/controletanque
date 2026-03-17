@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Monitoramento - UNAERP</title>
+    <link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
+    <style>
+        :root {
+            --ua-blue: #1e3a8a; /* Azul mais escuro e sóbrio */
+            --ua-lime: #a3e635;
+            --bg-light: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-light);
+            /* Degradê apenas como um detalhe de iluminação no fundo */
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(72, 105, 243, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(199, 220, 39, 0.05) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* Barra Superior Executiva */
+        .top-nav {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--ua-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .dot {
+            height: 8px;
+            width: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        /* Painel de Controle Sóbrio */
+        .control-panel {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .filters-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .field label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        select, input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            outline: none;
+            background: #ffffff;
+        }
+
+        .actions-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--ua-blue); color: white; border: none; }
+        .btn-secondary { background: white; color: var(--text-main); }
+        .btn:hover { opacity: 0.9; }
+
+        /* Tabela Estilo Enterprise */
+        .data-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: #f8fafc;
+            padding: 12px 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 14px 20px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #fdfdfd; }
+
+        .badge-level {
+            font-family: 'Roboto Mono', monospace;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .trend-up { color: #15803d; }
+        .trend-down { color: #b91c1c; }
+
+        .footer {
+            margin-top: 50px;
+            padding-bottom: 30px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav">
+        <div class="brand">
+            <a href="dashboard.html">
+                <img src="https://unaerp.br/wp-content/uploads/2025/07/logo-unaerp-vertical.png" height="40" alt="UNAERP">
+            </a>
+            <h1>Gestão de Reservatórios</h1>
+        </div>
+        <div class="status-indicator">
+            <span class="dot"></span>
+            SISTEMA OPERACIONAL • <span id="lastUpdate">CARREGANDO...</span>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="control-panel">
+            <div class="filters-group">
+                <div class="field">
+                    <label>Unidade / Tanque</label>
+                    <select id="tankSelect" onchange="fetchLogs()">
+                        <option value="all">Todos</option>
+                        <option value="1">Tanque 01</option>
+                        <option value="2">Tanque 02</option>
+                        <option value="3">Tanque 03</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>Período de Análise</label>
+                    <select id="exportRange" onchange="handleFilterChange()">
+                        <option value="all">Todos</option>
+                        <option value="1d">Últimas 24 Horas</option>
+                        <option value="1w">Últimos 7 Dias</option>
+                        <option value="custom">Intervalo Customizado</option>
+                    </select>
+                </div>
+
+                <div id="customDates" style="display: none; gap: 10px;">
+                    <div class="field">
+                        <label>Início</label>
+                        <input type="datetime-local" id="dateStart" onchange="fetchLogs()">
+                    </div>
+                    <div class="field">
+                        <label>Fim</label>
+                        <input type="datetime-local" id="dateEnd" onchange="fetchLogs()">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Ordenação</label>
+                    <select id="sortOrder" onchange="fetchLogs()">
+                        <option value="desc">Mais novos</option>
+                        <option value="asc">Mais antigos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="actions-group">
+                <button class="btn btn-secondary" onclick="exportarDados()">Exportar Relatório</button>
+                <button class="btn btn-primary" onclick="location.href='metrics.html'">Métricas Avançadas</button>
+            </div>
+        </div>
+
+        <div class="data-card">
+            <table id="logTable">
+                <thead>
+                    <tr>
+                        <th>Identificador</th>
+                        <th>Data Registro (Placa)</th>
+                        <th>Sincronização (Servidor)</th>
+                        <th>Nível Anterior</th>
+                        <th>Nível Atual</th>
+                        <th>Variação Líquida</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding: 40px;">Buscando registros...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer class="footer">
+        UNAERP • Engenharia de Software • Campus Ribeirão Preto • 2026
+    </footer>
+
+    <script>
+        const API_URL = '/pages/api/historico.js';
+
+        function verificarSessao() {
+            const loginTimestamp = localStorage.getItem('loginTimestamp');
+            const cincoMinutos = 10 * 60 * 1000; // 5 min em milissegundos
+            const agora = new Date().getTime();
+
+            // Se não houver data de login ou se a diferença for maior que 5 min
+            if (!loginTimestamp || (agora - loginTimestamp > cincoMinutos)) {
+                localStorage.removeItem('loginTimestamp'); // Limpa o que sobrou
+                alert("Sua sessão expirou (limite de 5 minutos). Faça login novamente.");
+                window.location.href = "index.html";
+            }
+        }
+
+        // Executa assim que a página abre
+        verificarSessao();
+
+        // Opcional: Verifica a cada 30 segundos se o tempo acabou enquanto ele olha a tela
+        setInterval(verificarSessao, 30000);
+
+
+        function handleFilterChange() {
+            const range = document.getElementById('exportRange').value;
+            document.getElementById('customDates').style.display = range === 'custom' ? 'flex' : 'none';
+            fetchLogs();
+        }
+
+        async function fetchLogs() {
+            const range = document.getElementById('exportRange').value;
+            const ordem = document.getElementById('sortOrder').value;
+            const tanque = document.getElementById('tankSelect').value;
+            
+            let url = `${API_URL}?intervalo=${range}&ordem=${ordem}&id_tanque=${tanque}`;
+            
+            if (range === 'custom') {
+                const inicio = document.getElementById('dateStart').value;
+                const fim = document.getElementById('dateEnd').value;
+                if (inicio && fim) url += `&inicio=${inicio}&fim=${fim}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                updateTable(data);
+                document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Erro:', error);
+                document.getElementById('logBody').innerHTML = '<tr><td colspan="6" style="color:red; text-align:center;">Falha na conexão com o banco de dados.</td></tr>';
+            }
+        }
+
+        function updateTable(logs) {
+            const body = document.getElementById('logBody');
+            if (!logs || logs.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px;">Sem registros para o filtro selecionado.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = logs.map(log => {
+                const atual = parseFloat(log.nivel_atual);
+                const anterior = log.nivel_anterior !== null ? parseFloat(log.nivel_anterior) : atual;
+                const diff = (atual - anterior).toFixed(2);
+                const diffClass = diff < 0 ? 'trend-down' : (diff > 0 ? 'trend-up' : '');
+                
+                return `
+                    <tr>
+                        <td><strong>Tanque 0${log.id_tanque}</strong></td>
+                        <td>${log.data_placa}</td>
+                        <td style="color: var(--text-muted); font-size: 0.8rem;">${log.data_servidor}</td>
+                        <td>${log.nivel_anterior !== null ? log.nivel_anterior + ' L' : '-'}</td>
+                        <td><span class="badge-level">${log.nivel_atual} L</span></td>
+                        <td class="${diffClass}">${diff > 0 ? '+' : ''}${diff} L</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function exportarDados() {
+            const range = document.getElementById('exportRange').value;
+            const ordem = document.getElementById('sortOrder').value;
+            const tanque = document.getElementById('tankSelect').value;
+            let url = `${API_URL}?format=csv&intervalo=${range}&ordem=${ordem}&id_tanque=${tanque}`;
+            
+            if (range === 'custom') {
+                const inicio = document.getElementById('dateStart').value;
+                const fim = document.getElementById('dateEnd').value;
+                if (!inicio || !fim) return alert("Selecione o intervalo.");
+                url += `&inicio=${inicio}&fim=${fim}`;
+            }
+            window.location.href = url;
+        }
+
+        fetchLogs();
+        setInterval(fetchLogs, 15000); // Frequência de atualização levemente reduzida para 15s
+    </script>
+</body>
+</html>

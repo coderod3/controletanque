@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Métricas Avançadas - UNAERP</title>
+    <link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --ua-blue: #1e3a8a;
+            --ua-lime: #a3e635;
+            --bg-light: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+        }
+
+        .top-nav {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        /* Painel de Filtros (Igual ao Dashboard) */
+        .filter-panel {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px 25px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+        }
+
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        .field label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        select, input { padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; }
+
+        /* Grid de Blocos */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .card h3 {
+            margin: 0 0 15px 0;
+            font-size: 0.9rem;
+            color: #64748b;
+            text-transform: uppercase;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 10px;
+        }
+
+        .big-number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--ua-blue);
+        }
+
+        .sub-text { font-size: 0.8rem; color: #94a3b8; }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+
+        .btn-back {
+            background: var(--ua-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a href="dashboard.html">
+                <img src="https://unaerp.br/wp-content/uploads/2025/07/logo-unaerp-vertical.png" height="40">
+            </a>
+            <h1 style="font-size: 1.1rem; margin: 0; text-transform: uppercase;">Análise de Métricas</h1>
+        </div>
+
+        <button class="btn-back" onclick="location.href='dashboard.html'">Voltar ao Monitoramento</button>
+    </nav>
+
+    <main class="main-content">
+        <div class="filter-panel">
+            <div class="field">
+                <label>Tanque</label>
+                <select id="tankSelect" onchange="fetchData()">
+                    <option value="all">Todos</option>
+                    <option value="1">Tanque 01</option>
+                    <option value="2">Tanque 02</option>
+                    <option value="3">Tanque 03</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Período</label>
+                <select id="exportRange" onchange="handleFilterChange()">
+                    <option value="all">Todo Histórico</option>
+                    <option value="1d">24 Horas</option>
+                    <option value="1w">7 Dias</option>
+                    <option value="custom">Personalizado</option>
+                </select>
+            </div>
+
+            <div id="customDates" style="display: none; gap: 10px;">
+                <div class="field">
+                    <label>Início</label>
+                    <input type="datetime-local" id="dateStart" onchange="fetchData()">
+                </div>
+                <div class="field">
+                    <label>Fim</label>
+                    <input type="datetime-local" id="dateEnd" onchange="fetchData()">
+                </div>
+            </div>
+
+            <div style="flex-grow: 1;"></div> <button class="btn-back" style="background-color: #1e3a8a;" onclick="exportarMetricas()">
+                Exportar Relatório
+            </button>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="card">
+                <h3>Consumo Total (Saída)</h3>
+                <div class="big-number" id="totalConsumo">0 L</div>
+                <p class="sub-text">Volume total retirado no período</p>
+                <div class="chart-container">
+                    <canvas id="consumptionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Abastecimento (Entrada)</h3>
+                <div class="big-number" id="totalAbastecido" style="color: #10b981;">0 L</div>
+                <p class="sub-text">Volume total reposto no período</p>
+                <div class="chart-container">
+                    <canvas id="supplyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Latência Média (Delay)</h3>
+                <div class="big-number" id="avgLatency">0ms</div>
+                <p class="sub-text">Atraso médio Placa -> Servidor</p>
+                <div class="chart-container">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = '/pages/api/historico.js';
+        let charts = {};
+
+
+        function verificarSessao() {
+            const loginTimestamp = localStorage.getItem('loginTimestamp');
+            const cincoMinutos = 10 * 60 * 1000; // 5 min em milissegundos
+            const agora = new Date().getTime();
+
+            // Se não houver data de login ou se a diferença for maior que 5 min
+            if (!loginTimestamp || (agora - loginTimestamp > cincoMinutos)) {
+                localStorage.removeItem('loginTimestamp'); // Limpa o que sobrou
+                alert("Sua sessão expirou (limite de 5 minutos). Faça login novamente.");
+                window.location.href = "index.html";
+            }
+        }
+
+        // Executa assim que a página abre
+        verificarSessao();
+
+        // Opcional: Verifica a cada 30 segundos se o tempo acabou enquanto ele olha a tela
+        setInterval(verificarSessao, 30000);
+
+        function handleFilterChange() {
+            const range = document.getElementById('exportRange').value;
+            document.getElementById('customDates').style.display = range === 'custom' ? 'flex' : 'none';
+            fetchData();
+        }
+
+        async function fetchData() {
+            const range = document.getElementById('exportRange').value;
+            const tanque = document.getElementById('tankSelect').value;
+            let url = `${API_URL}?intervalo=${range}&id_tanque=${tanque}&ordem=asc`;
+
+            if (range === 'custom') {
+                const inicio = document.getElementById('dateStart').value;
+                const fim = document.getElementById('dateEnd').value;
+                if (inicio && fim) url += `&inicio=${inicio}&fim=${fim}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                processMetrics(data);
+                document.getElementById('statusUpdate').innerText = `Atualizado às ${new Date().toLocaleTimeString()}`;
+            } catch (e) { console.error(e); }
+        }
+
+        // Função para exportar os mesmos dados filtrados
+        function exportarMetricas() {
+            const range = document.getElementById('exportRange').value;
+            const tanque = document.getElementById('tankSelect').value;
+            let url = `${API_URL}?format=csv&intervalo=${range}&id_tanque=${tanque}&ordem=asc`;
+
+            if (range === 'custom') {
+                const inicio = document.getElementById('dateStart').value;
+                const fim = document.getElementById('dateEnd').value;
+                if (!inicio || !fim) return alert("Selecione o período completo!");
+                url += `&inicio=${inicio}&fim=${fim}`;
+            }
+            window.location.href = url;
+        }
+
+        function parseDate(str) {
+            // Quebra a string: "15/03/2026 10:00:00.045"
+            const parts = str.split(/[/ :.]/);
+            const [d, m, y, h, min, s, ms] = parts;
+            
+            // Criamos a data usando Date.UTC para evitar que o navegador aplique fuso local
+            // e estrague o cálculo de delay
+            const timestamp = Date.UTC(y, m - 1, d, h, min, s, ms || 0);
+            return new Date(timestamp);
+        }
+
+        function processMetrics(logs) {
+            let consumo = 0;
+            let abastecimento = 0;
+            let latencias = [];
+            let labels = [];
+            let consumptionData = [];
+            let supplyData = [];
+
+            logs.forEach(log => {
+                // Cálculo de Volume
+                const diff = parseFloat(log.nivel_atual) - parseFloat(log.nivel_anterior || log.nivel_atual);
+                if (diff < 0) consumo += Math.abs(diff);
+                else abastecimento += diff;
+
+                // Cálculo de Latência
+                const tPlaca = parseDate(log.data_placa);
+                const tServ = parseDate(log.data_servidor);
+                const delay = tServ - tPlaca;
+                latencias.push(delay);
+                
+                labels.push(log.data_placa.split(' ')[1]); // Só a hora para o gráfico
+                consumptionData.push(diff < 0 ? Math.abs(diff) : 0);
+                supplyData.push(diff > 0 ? diff : 0);
+            });
+
+            const avgLat = latencias.length ? (latencias.reduce((a, b) => a + b, 0) / latencias.length) : 0;
+
+            // Atualiza números
+            document.getElementById('totalConsumo').innerText = `${consumo.toFixed(1)} L`;
+            document.getElementById('totalAbastecido').innerText = `${abastecimento.toFixed(1)} L`;
+            document.getElementById('avgLatency').innerText = `${Math.round(avgLat)}ms`;
+
+            updateCharts(labels, consumptionData, supplyData, latencias);
+        }
+
+        function updateCharts(labels, cons, supp, lat) {
+            const ctxCons = document.getElementById('consumptionChart').getContext('2d');
+            const ctxSupp = document.getElementById('supplyChart').getContext('2d');
+            const ctxLat = document.getElementById('latencyChart').getContext('2d');
+
+            // Destruir gráficos antigos se existirem
+            if (charts.cons) charts.cons.destroy();
+            if (charts.supp) charts.supp.destroy();
+            if (charts.lat) charts.lat.destroy();
+
+            // Configuração comum
+            const config = (label, data, color) => ({
+                type: 'line',
+                data: {
+                    labels: labels.slice(-20), // Últimos 20 pontos
+                    datasets: [{ label, data: data.slice(-20), borderColor: color, tension: 0.3, fill: true, backgroundColor: color + '22' }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+
+            charts.cons = new Chart(ctxCons, config('Consumo', cons, '#ef4444'));
+            charts.supp = new Chart(ctxSupp, config('Abastecimento', supp, '#10b981'));
+            charts.lat = new Chart(ctxLat, config('Delay (ms)', lat, '#3b82f6'));
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
