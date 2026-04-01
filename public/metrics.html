@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Métricas Avançadas - UNAERP</title>
+    <title>Métricas Avançadas</title>
     <link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -99,6 +99,55 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
+        }
+
+        /* --- Ajustes de Responsividade para Mobile (Métricas) --- */
+        @media (max-width: 768px) {
+            /* 1. Barra Superior: Empilha a logo/título e o botão de voltar */
+            .top-nav {
+                flex-direction: column;
+                align-items: stretch; /* Faz o botão esticar */
+                padding: 15px 20px;
+                gap: 15px;
+            }
+
+            .top-nav div {
+                justify-content: center; /* Centraliza a logo e o título */
+            }
+
+            .main-content {
+                margin: 20px auto;
+                padding: 0 15px;
+            }
+
+            /* 2. Painel de Filtros: Transforma em uma coluna única */
+            .filter-panel {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 15px;
+                gap: 15px;
+            }
+
+            .field, .field select, .field input {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            /* Força os campos de data customizada a ficarem em coluna */
+            #customDates {
+                flex-direction: column !important; 
+            }
+
+            /* 3. Botões: Ocupam 100% da largura para facilitar o toque */
+            .btn-back {
+                width: 100%;
+                text-align: center;
+                box-sizing: border-box;
+            }
+
+            .filter-panel .btn-back {
+                margin-top: 10px;
+            }
         }
     </style>
 </head>
@@ -287,8 +336,17 @@
             // Atualiza números
             document.getElementById('totalConsumo').innerText = `${consumo.toFixed(1)} L`;
             document.getElementById('totalAbastecido').innerText = `${abastecimento.toFixed(1)} L`;
-            document.getElementById('avgLatency').innerText = `${Math.round(avgLat)}ms`;
-
+            // Formatação inteligente de tempo (ms ou s)
+            let textoLatencia = "0ms";
+            if (avgLat >= 1000) {
+                // Se for maior ou igual a 1 segundo, divide por 1000 e mostra 's' com 1 casa decimal
+                textoLatencia = `${(avgLat / 1000).toFixed(1)}s`; 
+            } else {
+                // Se for menor que 1 segundo, mostra 'ms' arredondado
+                textoLatencia = `${Math.round(avgLat)}ms`; 
+            }
+            
+            document.getElementById('avgLatency').innerText = textoLatencia;
             updateCharts(labels, consumptionData, supplyData, latencias);
         }
 
