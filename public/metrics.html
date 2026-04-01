@@ -336,16 +336,36 @@
             // Atualiza números
             document.getElementById('totalConsumo').innerText = `${consumo.toFixed(1)} L`;
             document.getElementById('totalAbastecido').innerText = `${abastecimento.toFixed(1)} L`;
-            // Formatação inteligente de tempo (ms ou s)
+            // Formatação inteligente de tempo (ms, s, min, hr)
+            let absLat = Math.abs(avgLat); // Evita bugar se a placa estiver com o relógio "no futuro"
             let textoLatencia = "0ms";
-            if (avgLat >= 1000) {
-                // Se for maior ou igual a 1 segundo, divide por 1000 e mostra 's' com 1 casa decimal
-                textoLatencia = `${(avgLat / 1000).toFixed(1)}s`; 
+
+            if (absLat < 1000) {
+                // Menos de 1 segundo (ex: 450ms)
+                textoLatencia = `${Math.round(absLat)}ms`;
+                
+            } else if (absLat < 60000) {
+                // Entre 1 e 59 segundos (ex: 4.5s)
+                textoLatencia = `${(absLat / 1000).toFixed(1)}s`;
+                
+            } else if (absLat < 3600000) {
+                // Entre 1 minuto e 59 minutos (ex: 20m 40s)
+                let min = Math.floor(absLat / 60000);
+                let seg = Math.floor((absLat % 60000) / 1000);
+                textoLatencia = `${min}m ${seg}s`;
+                
             } else {
-                // Se for menor que 1 segundo, mostra 'ms' arredondado
-                textoLatencia = `${Math.round(avgLat)}ms`; 
+                // Mais de 1 hora de atraso (ex: 2h 15m)
+                let hr = Math.floor(absLat / 3600000);
+                let min = Math.floor((absLat % 3600000) / 60000);
+                textoLatencia = `${hr}h ${min}m`;
             }
-            
+
+            // Se por acaso o delay for negativo (placa adiantada), recoloca o sinal
+            if (avgLat < 0) {
+                textoLatencia = "-" + textoLatencia;
+            }
+
             document.getElementById('avgLatency').innerText = textoLatencia;
             updateCharts(labels, consumptionData, supplyData, latencias);
         }
