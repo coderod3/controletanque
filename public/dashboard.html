@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Monitoramento - UNAERP</title>
-    <link rel="icon" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png" type="image/png">
+    <title>Sistema de Monitoramento</title>
+    <link rel="icon" href="../pages/icons/image.png" type="image/png">
     <style>
         :root {
             --ua-blue: #1e3a8a; /* Azul mais escuro e sóbrio */
@@ -194,6 +194,84 @@
             color: var(--text-muted);
             border-top: 1px solid var(--border-color);
             padding-top: 20px;
+        }
+
+        /* --- Ajustes de Responsividade para Mobile (Dashboard) --- */
+        @media (max-width: 768px) {
+            /* 1. Barra Superior: Empilha a logo e o status */
+            .top-nav {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 15px 20px;
+                gap: 12px;
+            }
+
+            .main-content {
+                margin: 20px auto;
+                padding: 0 15px;
+            }
+
+            /* 2. Painel de Controle: Transforma os filtros em uma coluna */
+            .control-panel {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 15px;
+            }
+
+            .filters-group {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .field, .field select, .field input {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            /* Sobrescreve o display:flex inline que o JS injeta quando escolhe 'custom' */
+            #customDates {
+                flex-direction: column !important; 
+            }
+
+            .actions-group {
+                flex-direction: column;
+                width: 100%;
+                margin-top: 10px;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+
+            /* 3. Tabela Responsiva: Compacta e oculta colunas menos importantes */
+            .data-card {
+                overflow-x: hidden; /* Remove a barra de rolagem */
+            }
+
+            table {
+                min-width: 100%; /* A tabela respeita o tamanho da tela do celular */
+            }
+
+            th {
+                padding: 10px 5px;
+                font-size: 0.65rem; /* Diminui a fonte do cabeçalho */
+            }
+
+            td {
+                padding: 12px 5px;
+                font-size: 0.75rem; /* Diminui a fonte dos dados */
+            }
+
+            /* Oculta a 3ª coluna (Sincronização Servidor) */
+            th:nth-child(3), td:nth-child(3) {
+                display: none;
+            }
+
+            /* Oculta a 4ª coluna (Nível Anterior) */
+            th:nth-child(4), td:nth-child(4) {
+                display: none;
+            }
         }
     </style>
 </head>

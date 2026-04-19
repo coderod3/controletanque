@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Monitoramento de Tanques</title>
-    <link rel="icon" type="image/png" href="https://www3.unaerp.br/docente/resources/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" href="../pages/icons/image.png">
     
     <style>
         :root {
@@ -143,6 +143,51 @@
             font-weight: 600;
             pointer-events: none;
             z-index: 1;
+        }
+
+        /* --- Ajustes Definitivos de Responsividade --- */
+        
+        .login-container {
+            /* Garante que o padding não faça a caixa ultrapassar 100% da tela */
+            box-sizing: border-box; 
+        }
+
+        @media (max-width: 480px) {
+            body, html {
+                /* Libera o scroll apenas se faltar espaço */
+                overflow-y: auto; 
+            }
+
+            .login-container {
+                padding: 15px; /* Margem segura para as laterais do celular */
+                transform: translateY(-20px); /* Sobe menos a caixa para não cortar o logo */
+            }
+
+            .login-card {
+                padding: 30px 20px; /* Reduz respiro interno para os inputs terem mais espaço */
+            }
+
+            .brand-logo {
+                width: 90px; /* Logo sutilmente menor */
+                margin-bottom: 20px;
+            }
+
+            .system-footer {
+                /* Mantido como absolute para NÃO esmagar a caixa para a esquerda */
+                bottom: 15px;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* Truque de ouro: Quando o teclado do celular abrir (tela fica baixa), 
+           escondemos o rodapé para ele não ficar em cima do botão de login */
+        @media (max-height: 550px) {
+            .system-footer {
+                display: none;
+            }
+            .login-container {
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
