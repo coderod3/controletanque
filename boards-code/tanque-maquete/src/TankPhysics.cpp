@@ -22,11 +22,17 @@ void TankPhysics::init() {
 }
 
 float TankPhysics::_calculateVolume(float distance) {
-    // Lógica: Se 18cm é 0L e 2cm é 2L, a fórmula é:
-    float volume = (TANK_HEIGHT_EMPTY - distance) * (2.0 / (TANK_HEIGHT_EMPTY - TANK_HEIGHT_FULL));
+    // Se a distância for maior que o vazio, volume é 0
+    if (distance >= TANK_HEIGHT_EMPTY) return 0.0;
     
-    // Garante que o volume fique entre 0 e 2 Litros
-    return fmax(0.0, fmin(2.0, volume)); 
+    // Se a distância for menor que o cheio (topo), volume é o máximo
+    if (distance <= TANK_HEIGHT_FULL) return TANK_MAX_VOLUME;
+
+    // Cálculo: (100 - Distância Atual) * 1.0
+    // Exemplo: Distância 30cm -> (100 - 30) * 1 = 70 Litros
+    float volume = (TANK_HEIGHT_EMPTY - distance) * TANK_BASE_AREA;
+    
+    return volume;
 }
 
 void TankPhysics::update() {

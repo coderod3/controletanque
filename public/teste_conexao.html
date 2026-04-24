@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Teste de Via de Mão Dupla - MQTT</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        .box { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .status-online { color: green; font-weight: bold; }
+        .status-offline { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Nexus - Teste de Comunicação</h1>
+    
+    <div class="box">
+        <p>Status do Broker: <span id="mqtt-status" class="status-offline">Desconectado</span></p>
+    </div>
+
+    <div class="box">
+        <h3>Recebido da Placa (Telemetria):</h3>
+        <p>Nível Atual: <strong id="valor-nivel">--</strong> Litros</p>
+    </div>
+
+    <div class="box">
+        <h3>Enviar Comando para a Placa:</h3>
+        <button onclick="enviar('LIGAR')">Ligar Bomba</button>
+        <button onclick="enviar('DESLIGAR')">Desligar Bomba</button>
+        <input type="number" id="input-vol" placeholder="Volume (L)">
+        <button onclick="enviar('SET_VOL', document.getElementById('input-vol').value)">Setar Volume</button>
+    </div>
+
+    <script>
+        // Configuração via WebSockets (Porta 8884)
+        const host = 'wss://b5dfbf70844741db84d31800c3bd77a0.s1.eu.hivemq.cloud:8884/mqtt';
+        
+        const options = {
+            clientId: 'web_test_' + Math.random().toString(16).substring(2, 8),
+            username: 'web_dashboard',
+            password: 'Macron@12', // Usei a do seu .env
+        };
+
+        const client = mqtt.connect(host, options);
+
+        client.on('connect', () => {
+            document.getElementById('mqtt-status').innerText = 'Conectado ✅';
+            document.getElementById('mqtt-status').className = 'status-online';
+            client.subscribe('tanque/telemetria');
+            console.log('Inscrito no tópico de telemetria');
+        });
+
+        client.on('error', (err) => {
+            console.error('Erro de conexão:', err);
+            document.getElementById('mqtt-status').innerText = 'Erro na Conexão';
+        });
+
+        // 1. OUVINDO A PLACA
+        client.on('message', (topic, message) => {
+            if (topic === 'tanque/telemetria') {
+                const data = JSON.parse(message.toString());
+                document.getElementById('valor-nivel').innerText = data.nivel;
+                console.log('Placa disse:', data);
+            }
+        });
+
+        // 2. ENVIANDO PARA A PLACA
+        function enviar(acao, valor = null) {
+            const payload = JSON.stringify({ acao, valor: parseFloat(valor) });
+            client.publish('tanque/comando', payload);
+            alert('Comando ' + acao + ' enviado para a placa!');
+        }
+    </script>
+</body>
+</html>

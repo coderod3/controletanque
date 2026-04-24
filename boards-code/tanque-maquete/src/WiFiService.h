@@ -2,32 +2,52 @@
 #define WIFI_SERVICE_H
 
 #include <WiFi.h>
-#include "config.h"
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
+#include "Config.h"
 
 class WiFiService {
 public:
     WiFiService();
     
-    // Inicia a tarefa no Core 0
+    // Inicia a conexão e dispara a tarefa no Core 0
     void init();
     
-    // Status para a Máquina de Estados
+    // Status para o Display e Máquina de Estados (Core 1)
     bool isConnected();
     
-    // Adiciona log à fila de envio (Thread-Safe)
+    // Envia o nível do tanque (Telemetria)
+    void publishTelemetria(float nivel);
+
+    // Mantido para compatibilidade com o resto do sistema
+    // Agora envia via MQTT no tópico de telemetria/eventos
     void queueLog(String message);
 
+    // Retorna o comando vindo do Dashboard (ex: "LIGAR", "PARAR")
+    // O Core 1 chama isso para saber o que o site mandou
+    String getPendingCommand();
+
 private:
+    // O loop de rede que rodará no Core 0
     static void _networkTask(void* pvParameters);
+    
+    // Função obrigatória para o MQTT ouvir o Broker
+    static void _mqttCallback(char* topic, byte* payload, unsigned int length);
+    
     bool _connected;
     
-    // Fila interna para logs offline (Buffer Circular Simples)
+    // Variáveis estáticas para comunicação segura entre núcleos
+    static String _lastCommand;
+    static bool _hasNewCommand;
+
+    // Buffer de logs (Mantido caso você queira persistência offline)
     static const int LOG_BUFFER_SIZE = 20;
     String _logBuffer[LOG_BUFFER_SIZE];
     int _head = 0;
     int _tail = 0;
 };
 
+// Instância global para ser usada em todo o projeto
 extern WiFiService connectivity;
 
 #endif
