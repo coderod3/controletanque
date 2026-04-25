@@ -11,33 +11,53 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const host = process.env.NEXT_PUBLIC_MQTT_URL;
+    
+    // Debug: Isso vai aparecer no console do seu navegador (F12)
+    console.log("Configuração MQTT - Host:", host);
+    console.log("Configuração MQTT - User:", process.env.NEXT_PUBLIC_MQTT_USER);
+
+    if (!host) {
+      setStatus('Erro: Variáveis de Ambiente ausentes na Vercel ❌');
+      return;
+    }
+
     const options = {
-      username: 'web_dashboard',
-      password: 'Macron@12',
+      username: process.env.NEXT_PUBLIC_MQTT_USER || 'web_dashboard',
+      password: process.env.NEXT_PUBLIC_MQTT_PASS || 'Macron@12',
       clientId: 'nexus_web_' + Math.random().toString(16).substring(2, 8),
+      // Força o uso de WebSocket Seguro para evitar o erro de Mixed Content
+      protocol: 'wss',
+      rejectUnauthorized: false // Útil se houver problemas de certificado no broker
     };
 
     const mqttClient = mqtt.connect(host, options);
 
     mqttClient.on('connect', () => {
+      console.log("Conectado com sucesso ao Broker!");
       setStatus('Online ✅');
       mqttClient.subscribe('tanque/telemetria');
     });
 
     mqttClient.on('message', (topic, message) => {
       if (topic === 'tanque/telemetria') {
-        const data = JSON.parse(message.toString());
-        setNivel(data.nivel || 0);
+        try {
+          const data = JSON.parse(message.toString());
+          setNivel(data.nivel || 0);
+        } catch (e) {
+          console.error("Erro no parse do JSON:", e);
+        }
       }
     });
 
     mqttClient.on('error', (err) => {
-      console.error('Erro MQTT:', err);
+      console.error('Erro de conexão MQTT:', err);
       setStatus('Erro na Conexão');
     });
 
     setClient(mqttClient);
-    return () => mqttClient.end();
+    return () => {
+      if (mqttClient) mqttClient.end();
+    };
   }, []);
 
   const enviarComando = (vol, encher) => {
