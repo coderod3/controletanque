@@ -7,19 +7,15 @@ export default async function handler(req, res) {
   const client = await db.connect();
 
   try {
-    // 1. Busca o ID do usuário pelo RFID
+    // Dentro do handler da auditoria.js
     const userRes = await client.sql`
       SELECT id FROM usuarios WHERE rfid_uid = ${rfid_uid} LIMIT 1
     `;
-    const usuario_id = userRes.rows[0]?.id || null;
+    const usuario_id = userRes.rows[0]?.id || null; // Pega o UUID gerado pelo Neon
 
-    // 2. Insere no histórico (Audit Log)
     await client.sql`
-      INSERT INTO historico (
-        usuario_id, evento, origem, valor_recebido, valor_anterior, valor_atual, status
-      ) VALUES (
-        ${usuario_id}, ${acao}, 'HARDWARE', ${volume}, ${valor_anterior}, ${valor_atual}, ${status}
-      )
+      INSERT INTO historico (usuario_id, evento, origem, valor_recebido, valor_anterior, valor_atual, status)
+      VALUES (${usuario_id}, ${acao}, 'HARDWARE', ${volume}, ${valor_anterior}, ${valor_atual}, ${status})
     `;
 
     // 3. Atualiza o nível atual do tanque no "Gêmeo Digital"
