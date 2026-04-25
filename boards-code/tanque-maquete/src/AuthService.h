@@ -3,7 +3,7 @@
 
 #include <SPI.h>
 #include <MFRC522.h>
-#include "config.h"
+#include "Config.h" // Corrigido para C maiúsculo
 
 class AuthService {
 public:
@@ -11,23 +11,21 @@ public:
     
     void init();
     
-    // Verifica se há uma tag presente e valida contra a "lista branca"
+    // Agora valida a tag via POST para a Vercel/Neon
     bool update(); 
     
     // Getters para a Máquina de Estados
     bool isAuthorized();
     String getActiveUserID();
     
-    // Encerra a sessão (após a operação ou por timeout)
+    // Encerra a sessão
     void logout();
 
 private:
     MFRC522 _mfrc522;
     bool _authorized;
     String _activeUserID;
-    
-    // Simulação de banco de dados local (pode ser expandido para consulta via WiFiService)
-    bool _checkWhitelist(String uid);
+    // _checkWhitelist removido: a validação agora é externa (API)
 };
 
 extern AuthService auth;

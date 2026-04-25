@@ -1,26 +1,25 @@
 #include <Arduino.h>
-#include <SPI.h> // Importante garantir a inclusão
+#include <SPI.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 #include "Config.h"
 #include "AuthService.h"
 
 AuthService::AuthService() : _mfrc522(PIN_RFID_SS, PIN_RFID_RST), _authorized(false), _activeUserID("") {}
 
 void AuthService::init() {
-    // CORREÇÃO 1: Iniciar o barramento SPI explicitamente com os pinos do Config.h
     SPI.begin(PIN_RFID_SCK, PIN_RFID_MISO, PIN_RFID_MOSI, PIN_RFID_SS);
-    
     _mfrc522.PCD_Init();
-    Serial.println("[Auth] RFID MFRC522 Inicializado.");
+    Serial.println("[Auth] RFID Online.");
 }
 
 bool AuthService::update() {
     if (_authorized) return true;
 
-    // Se não houver cartão presente, retorna falso rápido
-    if (!_mfrc522.PICC_IsNewCardPresent() || !_mfrc522.PICC_ReadCardSerial()) {
-        return false;
-    }
+    // Detecta nova tag
+    if (!_mfrc522.PICC_IsNewCardPresent() || !_mfrc522.PICC_ReadCardSerial()) return false;
 
+    // Converte UID para String Hex
     String uid = "";
     for (byte i = 0; i < _mfrc522.uid.size; i++) {
         uid += String(_mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
@@ -28,41 +27,46 @@ bool AuthService::update() {
     }
     uid.toUpperCase();
 
-    // Debug para você ver no console exatamente como a string está chegando
-    Serial.print("[Auth] Tag detectada: ");
-    Serial.println(uid);
+    Serial.println("[Auth] Validando na nuvem: " + uid);
 
-    if (_checkWhitelist(uid)) {
-        _authorized = true;
-        _activeUserID = uid;
-        Serial.println("[Auth] ACESSO LIBERADO!");
-        return true;
-    } else {
-        Serial.println("[Auth] ACESSO NEGADO - UID INVALIDO");
-        // Dá um pequeno delay para não ficar spamando erro no console
-        delay(500); 
+    if (WiFi.status() == WL_CONNECTED) {
+        HTTPClient http;
+        // Caminho exato que você criou
+        http.begin("https://controletanque.vercel.app/api/auth/auth");
+        http.addHeader("Content-Type", "application/json");
+
+        // Prepara o JSON seguro
+        StaticJsonDocument<128> doc;
+        doc["tag_id"] = uid;
+        String jsonBody;
+        serializeJson(doc, jsonBody);
+
+        int httpCode = http.POST(jsonBody);
+
+        if (httpCode == 200) {
+            String response = http.getString();
+            StaticJsonDocument<200> resDoc;
+            deserializeJson(resDoc, response);
+            
+            _authorized = true;
+            _activeUserID = uid;
+            Serial.printf("[Auth] Bem-vindo: %s (%s)\n", resDoc["nome"].as<const char*>(), resDoc["cargo"].as<const char*>());
+        } else {
+            Serial.println("[Auth] Acesso negado. Código: " + String(httpCode));
+            delay(1000); // Evita múltiplas tentativas imediatas
+        }
+        http.end();
     }
 
     _mfrc522.PICC_HaltA();
     _mfrc522.PCD_StopCrypto1();
-
-    return false;
-}
-
-bool AuthService::_checkWhitelist(String uid) {
-    // CORREÇÃO 2: Removi os ":" para bater com a string gerada pelo loop
-    if (uid == "01020304" || uid == "A1B2C3D4") return true; 
-    
-    // Tag padrão de muitos kits (também sem os ":")
-    if (uid == "83181D1A") return true; 
-
-    return false;
+    return _authorized;
 }
 
 void AuthService::logout() {
     _authorized = false;
     _activeUserID = "";
-    Serial.println("[Auth] Sessão encerrada.");
+    Serial.println("[Auth] Logoff realizado.");
 }
 
 bool AuthService::isAuthorized() { return _authorized; }

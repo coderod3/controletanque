@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include "Config.h"
+#include <HTTPClient.h>
 #include <queue>
 
 // Inclusão dos nossos módulos modulares
@@ -309,10 +310,33 @@ void processExecuting() {
 
     bool atingiuAlvo = job.encher ? (tank.getVolume() >= targetVolume) : (tank.getVolume() <= targetVolume);
     
+
     if (atingiuAlvo) {
+        float nivelFinal = tank.getVolume();
         forceHardwareStop();
+
+        // REGISTRO DE AUDITORIA (HARDWARE -> CLOUD)
+        if (WiFi.status() == WL_CONNECTED) {
+            HTTPClient http;
+            http.begin("https://controletanque.vercel.app/api/telemetria/auditoria");
+            http.addHeader("Content-Type", "application/json");
+
+            StaticJsonDocument<256> doc;
+            doc["rfid_uid"] = auth.getActiveUserID();
+            doc["acao"] = jobQueue.front().encher ? "ABASTECER" : "DRENAR";
+            doc["volume"] = jobQueue.front().volumeSolicitado;
+            doc["valor_anterior"] = levelAtPumpStart;
+            doc["valor_atual"] = nivelFinal;
+            doc["status"] = "SUCESSO";
+
+            String json;
+            serializeJson(doc, json);
+            http.POST(json);
+            http.end();
+        }
+
         jobQueue.pop();
-        connectivity.queueLog("JOB_OK: " + job.origem);
+        connectivity.queueLog("EVENTO: OPERACAO_CONCLUIDA");
         needsUpdate = true;
         currentState = STATE_IDLE;
     }
