@@ -8,6 +8,7 @@ export default function DashboardPage() {
   const [status, setStatus] = useState('Conectando...');
   const [client, setClient] = useState(null);
   const [volumeInput, setVolumeInput] = useState(10);
+  const [operador, setOperador] = useState('Nenhum');
 
   useEffect(() => {
     const host = process.env.NEXT_PUBLIC_MQTT_URL;
@@ -43,6 +44,7 @@ export default function DashboardPage() {
         try {
           const data = JSON.parse(message.toString());
           setNivel(data.nivel || 0);
+          setOperador(data.operador || 'Nenhum'); // PEGA O NOME DO JSON
         } catch (e) {
           console.error("Erro no parse do JSON:", e);
         }
@@ -69,11 +71,26 @@ export default function DashboardPage() {
       }));
     }
   };
+  
+  const dispararCalibracao = (novoMax, novaVazio, novaCheio) => {
+    if (client?.connected) {
+      const payload = {
+        acao: "SYNC_CONFIG",
+        max_volume: parseFloat(novoMax),
+        dist_vazio: parseFloat(novaVazio),
+        dist_cheio: parseFloat(novaCheio)
+      };
+      
+      client.publish('tanque/comando', JSON.stringify(payload));
+      console.log("Comando de calibração enviado:", payload);
+    }
+  };
 
   return (
     <div style={{ padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <h1>Painel de Controle de Tanques</h1>
       <p>Status: <strong>{status}</strong></p>
+      <p>Operador Ativo: <strong style={{ color: '#2563eb' }}>{operador}</strong></p>
       
       <div style={{ display: 'flex', gap: '50px', marginTop: '30px', alignItems: 'center' }}>
         <WaterTank nivel={nivel} />

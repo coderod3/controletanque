@@ -118,7 +118,7 @@ void handleCommunication() {
     // 1. Telemetria (A cada 2 segundos)
     static unsigned long lastMqttPub = 0;
     if (millis() - lastMqttPub > 2000) { 
-        connectivity.publishTelemetria(tank.getVolume());
+        connectivity.publishTelemetria(tank.getVolume(), auth.getActiveUserName());
         lastMqttPub = millis();
     }
 
@@ -165,6 +165,21 @@ void handleCommunication() {
             } else {
                 connectivity.queueLog("REMOTO_NEGADO: LIMITE_EXCEDIDO");
             }
+        }
+        // Dentro de handleCommunication(), na parte de processamento de comandos:
+
+        else if (acao == "SYNC_CONFIG") {
+            // Usamos o pipe "|" para garantir que, se o JSON falhar, 
+            // ele use o valor atual do tanque em vez de zero.
+            float maxV   = doc["max_volume"] | tank.getMaxVolume();
+            float dVazio = doc["dist_vazio"] | tank.getRawDistance(); // ou um valor seguro do Config.h
+            float dCheio = doc["dist_cheio"] | 1.0; // Evita divisão por zero no cálculo de volume
+            
+            tank.syncConfig(maxV, dVazio, dCheio);
+            
+            connectivity.queueLog("CONFIG_SYNCED_SUCCESS");
+            display.showStatus("CALIBRADO", String(maxV) + "L OK");
+            virtualVolume = tank.getVolume();
         }
     }
 }

@@ -17,7 +17,7 @@ public:
     bool isConnected();
     
     // Envia o nível do tanque (Telemetria)
-    void publishTelemetria(float nivel);
+    void publishTelemetria(float nivel, String operador);
 
     // Mantido para compatibilidade com o resto do sistema
     // Agora envia via MQTT no tópico de telemetria/eventos

@@ -32,10 +32,11 @@ bool WiFiService::isConnected() {
     return (WiFi.status() == WL_CONNECTED && mqttClient.connected());
 }
 
-void WiFiService::publishTelemetria(float nivel) {
+void WiFiService::publishTelemetria(float nivel, String operador) {
     if (mqttClient.connected()) {
         StaticJsonDocument<128> doc;
         doc["nivel"] = nivel;
+        doc["operador"] = operador == "" ? "Nenhum" : operador; // Envia o nome ou "Nenhum"
         doc["timestamp"] = millis();
         
         char buffer[128];

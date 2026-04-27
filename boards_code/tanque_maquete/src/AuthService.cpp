@@ -50,6 +50,7 @@ bool AuthService::update() {
             
             _authorized = true;
             _activeUserID = uid;
+            _activeUserName = resDoc["nome"].as<String>(); // SALVA O NOME AQUI
             Serial.printf("[Auth] Bem-vindo: %s (%s)\n", resDoc["nome"].as<const char*>(), resDoc["cargo"].as<const char*>());
         } else {
             Serial.println("[Auth] Acesso negado. Código: " + String(httpCode));

@@ -21,11 +21,14 @@ public:
     // Encerra a sessão
     void logout();
 
+    String getActiveUserName(); // Novo método
+
 private:
     MFRC522 _mfrc522;
     bool _authorized;
     String _activeUserID;
     // _checkWhitelist removido: a validação agora é externa (API)
+    String _activeUserName; // Nova variável
 };
 
 extern AuthService auth;
