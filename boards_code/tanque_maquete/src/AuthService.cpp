@@ -72,5 +72,5 @@ void AuthService::logout() {
 
 bool AuthService::isAuthorized() { return _authorized; }
 String AuthService::getActiveUserID() { return _activeUserID; }
-
+String AuthService::getActiveUserName() { return _activeUserName; }
 AuthService auth;

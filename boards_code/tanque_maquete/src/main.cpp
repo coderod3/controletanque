@@ -65,6 +65,7 @@ void IRAM_ATTR handleOverflowInterrupt();
 void forceHardwareStop();
 bool isOperationPossible(TankJob job);
 void updateStatusLED(SystemState state);
+void syncDigitalTwin(String estado);
 
 // =============================================================================
 // SETUP
