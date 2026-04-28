@@ -302,11 +302,16 @@ void processValidating() {
     stateStartTime = millis();
     lastLevelChangeTime = millis();
     needsUpdate = true;
+    
+    // Gêmeo Digital: Avisa o banco ANTES de ligar a bomba
+    syncDigitalTwin("EXECUTANDO");
+    
     currentState = STATE_EXECUTING;
 }
 
 void processExecuting() {
     static float lastExecV = 0;
+
     if (needsUpdate || abs(tank.getVolume() - lastExecV) > 0.05) {
         TankJob job = jobQueue.front();
         display.showExecuting(tank.getVolume(), targetVolume, job.encher);
@@ -323,8 +328,7 @@ void processExecuting() {
         digitalWrite(PIN_BOMBA_ENCHER, LOW);
     }
 
-    bool atingiuAlvo = job.encher ? (tank.getVolume() >= targetVolume) : (tank.getVolume() <= targetVolume);
-    
+    bool atingiuAlvo = job.encher ? (tank.getVolume() >= targetVolume) : (tank.getVolume() <= targetVolume);    
 
     if (atingiuAlvo) {
         float nivelFinal = tank.getVolume();
@@ -354,6 +358,9 @@ void processExecuting() {
         connectivity.queueLog("EVENTO: OPERACAO_CONCLUIDA");
         needsUpdate = true;
         currentState = STATE_IDLE;
+
+        // Gêmeo Digital: Avisa o banco que voltou a ficar livre
+        syncDigitalTwin("IDLE");
     }
 
     if (millis() - lastLevelChangeTime > BOMBA_TIMEOUT_MS) {
@@ -361,6 +368,9 @@ void processExecuting() {
             needsUpdate = true;
             currentState = STATE_ERROR;
             connectivity.queueLog("ERRO: BOMBA TRAVADA");
+
+            // Gêmeo Digital: Avisa o banco sobre a falha crítica
+            syncDigitalTwin("ERRO: BOMBA TRAVADA");
         } else {
             lastLevelChangeTime = millis();
             levelAtPumpStart = tank.getVolume();
@@ -381,6 +391,10 @@ void processEmergency() {
         forceHardwareStop();
         display.showEmergency(); 
         updateStatusLED(STATE_EMERGENCY);
+        
+        // Gêmeo Digital: Trava de emergência reflete no banco imediatamente
+        syncDigitalTwin("EMERGENCIA");
+        
         needsUpdate = false;
     }
 }
@@ -416,5 +430,23 @@ void updateStatusLED(SystemState state) {
         if (!enchendo) analogWrite(PIN_LED_R, 255); 
     } else if (state == STATE_EMERGENCY || state == STATE_ERROR) {
         analogWrite(PIN_LED_R, 255); analogWrite(PIN_LED_G, 0); analogWrite(PIN_LED_B, 0);
+    }
+}
+
+// --- NOVA FUNÇÃO: Sincroniza o estado atual com o banco (Digital Twin) ---
+void syncDigitalTwin(String statusOperacional) {
+    if (WiFi.status() == WL_CONNECTED) {
+        HTTPClient http;
+        http.begin("https://controletanque.vercel.app/api/telemetria/status");
+        http.addHeader("Content-Type", "application/json");
+
+        StaticJsonDocument<128> doc;
+        doc["status"] = statusOperacional;
+        doc["nivel"] = tank.getVolume();
+
+        String json;
+        serializeJson(doc, json);
+        http.POST(json);
+        http.end();
     }
 }

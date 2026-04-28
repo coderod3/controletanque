@@ -1,41 +1,60 @@
 import { useEffect, useState } from 'react';
 import mqtt from 'mqtt';
-// Importação do componente visual que deve estar em components/WaterTank.js
-import WaterTank from '../components/WaterTank';
+import WaterTank from '../components/WaterTank'; // Ajuste o caminho se necessário
 
 export default function DashboardPage() {
   const [nivel, setNivel] = useState(0);
-  const [status, setStatus] = useState('Conectando...');
+  const [statusMqtt, setStatusMqtt] = useState('Conectando...');
   const [client, setClient] = useState(null);
   const [volumeInput, setVolumeInput] = useState(10);
   const [operador, setOperador] = useState('Nenhum');
+  
+  // NOVOS ESTADOS PARA O GÊMEO DIGITAL
+  const [statusTanqueDB, setStatusTanqueDB] = useState('CARREGANDO...');
+  const [configDB, setConfigDB] = useState({ max: 100, vazio: 100, cheio: 10 });
 
+  // FUNÇÃO PARA LER O BANCO DE DADOS
+  const fetchDigitalTwin = async () => {
+    try {
+      const res = await fetch('/api/tanques/status');
+      if (res.ok) {
+        const data = await res.json();
+        setStatusTanqueDB(data.status_operacional);
+        setConfigDB({
+          max: data.volume_maximo,
+          vazio: data.distancia_vazio,
+          cheio: data.distancia_cheio
+        });
+      }
+    } catch (e) {
+      console.error("Erro ao sincronizar Gêmeo Digital:", e);
+    }
+  };
+
+  // LOOP DE SINCRONIZAÇÃO (a cada 3 segundos)
+  useEffect(() => {
+    fetchDigitalTwin();
+    const interval = setInterval(fetchDigitalTwin, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // CONFIGURAÇÃO MQTT (Mantém a que você já tem)
   useEffect(() => {
     const host = process.env.NEXT_PUBLIC_MQTT_URL;
-    
-    // Debug: Isso vai aparecer no console do seu navegador (F12)
-    console.log("Configuração MQTT - Host:", host);
-    console.log("Configuração MQTT - User:", process.env.NEXT_PUBLIC_MQTT_USER);
-
-    if (!host) {
-      setStatus('Erro: Variáveis de Ambiente ausentes na Vercel ❌');
-      return;
-    }
+    if (!host) return;
 
     const options = {
       username: process.env.NEXT_PUBLIC_MQTT_USER || 'web_dashboard',
       password: process.env.NEXT_PUBLIC_MQTT_PASS || 'Macron@12',
       clientId: 'nexus_web_' + Math.random().toString(16).substring(2, 8),
-      // Força o uso de WebSocket Seguro para evitar o erro de Mixed Content
       protocol: 'wss',
-      rejectUnauthorized: false // Útil se houver problemas de certificado no broker
+      rejectUnauthorized: false
     };
 
     const mqttClient = mqtt.connect(host, options);
 
     mqttClient.on('connect', () => {
-      console.log("Conectado com sucesso ao Broker!");
-      setStatus('Online ✅');
+      setStatusMqtt('Online ✅');
       mqttClient.subscribe('tanque/telemetria');
     });
 
@@ -44,75 +63,125 @@ export default function DashboardPage() {
         try {
           const data = JSON.parse(message.toString());
           setNivel(data.nivel || 0);
-          setOperador(data.operador || 'Nenhum'); // PEGA O NOME DO JSON
-        } catch (e) {
-          console.error("Erro no parse do JSON:", e);
-        }
+          setOperador(data.operador || 'Nenhum');
+        } catch (e) {}
       }
     });
 
-    mqttClient.on('error', (err) => {
-      console.error('Erro de conexão MQTT:', err);
-      setStatus('Erro na Conexão');
-    });
-
     setClient(mqttClient);
-    return () => {
-      if (mqttClient) mqttClient.end();
-    };
+    return () => { if (mqttClient) mqttClient.end(); };
   }, []);
 
+  // Ações
   const enviarComando = (vol, encher) => {
-    if (client?.connected) {
+    if (client?.connected && statusTanqueDB === 'IDLE') {
       client.publish('tanque/comando', JSON.stringify({
-        acao: "EXECUTAR",
-        volume: parseFloat(vol),
-        encher: encher
+        acao: "EXECUTAR", volume: parseFloat(vol), encher: encher
       }));
     }
   };
-  
-  const dispararCalibracao = (novoMax, novaVazio, novaCheio) => {
+
+  const dispararCalibracao = () => {
     if (client?.connected) {
-      const payload = {
+      client.publish('tanque/comando', JSON.stringify({
         acao: "SYNC_CONFIG",
-        max_volume: parseFloat(novoMax),
-        dist_vazio: parseFloat(novaVazio),
-        dist_cheio: parseFloat(novaCheio)
-      };
-      
-      client.publish('tanque/comando', JSON.stringify(payload));
-      console.log("Comando de calibração enviado:", payload);
+        max_volume: parseFloat(configDB.max),
+        dist_vazio: parseFloat(configDB.vazio),
+        dist_cheio: parseFloat(configDB.cheio)
+      }));
+      alert("Comando de calibração enviado! O ESP32 salvará isso na Flash.");
     }
   };
 
+  // VARIÁVEL DE TRAVA (Bloqueia a UI se não estiver IDLE)
+  const isOcupado = statusTanqueDB !== 'IDLE';
+
   return (
     <div style={{ padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      <h1>Painel de Controle de Tanques</h1>
-      <p>Status: <strong>{status}</strong></p>
-      <p>Operador Ativo: <strong style={{ color: '#2563eb' }}>{operador}</strong></p>
+      <h1>Painel de Controle e Gêmeo Digital</h1>
       
-      <div style={{ display: 'flex', gap: '50px', marginTop: '30px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1 }}>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>CONEXÃO MQTT (TEMPO REAL)</p>
+          <strong style={{ fontSize: '1.2rem' }}>{statusMqtt}</strong>
+        </div>
+        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1 }}>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>STATUS DO HARDWARE (BANCO DE DADOS)</p>
+          <strong style={{ fontSize: '1.2rem', color: isOcupado ? '#ef4444' : '#22c55e' }}>{statusTanqueDB}</strong>
+        </div>
+        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1 }}>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>OPERADOR LOCAL</p>
+          <strong style={{ fontSize: '1.2rem', color: '#2563eb' }}>{operador}</strong>
+        </div>
+      </div>
+      
+      <div style={{ display: 'flex', gap: '50px', marginTop: '30px', alignItems: 'flex-start' }}>
+        {/* Componente Visual do Tanque */}
         <WaterTank nivel={nivel} />
         
-        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <label style={{ display: 'block', marginBottom: '10px' }}>Volume (Litros):</label>
-          <input 
-            type="number" 
-            value={volumeInput} 
-            onChange={(e) => setVolumeInput(e.target.value)}
-            style={{ fontSize: '20px', padding: '10px', width: '100px', marginBottom: '20px' }}
-          />
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={() => enviarComando(volumeInput, true)} style={{ padding: '15px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>ENCHER</button>
-            <button onClick={() => enviarComando(volumeInput, false)} style={{ padding: '15px', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>ESVAZIAR</button>
+        <div style={{ flex: 1 }}>
+          {/* PAINEL DE CONTROLE DE TAREFAS */}
+          <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+            <h3 style={{ marginTop: 0 }}>Operação de Volume</h3>
+            <label style={{ display: 'block', marginBottom: '10px' }}>Volume (Litros):</label>
+            <input 
+              type="number" value={volumeInput} onChange={(e) => setVolumeInput(e.target.value)}
+              disabled={isOcupado}
+              style={{ fontSize: '20px', padding: '10px', width: '100px', marginBottom: '20px', opacity: isOcupado ? 0.5 : 1 }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                onClick={() => enviarComando(volumeInput, true)} 
+                disabled={isOcupado}
+                style={{ padding: '15px', backgroundColor: isOcupado ? '#94a3b8' : '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: isOcupado ? 'not-allowed' : 'pointer', flex: 1 }}
+              >
+                ENCHER
+              </button>
+              <button 
+                onClick={() => enviarComando(volumeInput, false)} 
+                disabled={isOcupado}
+                style={{ padding: '15px', backgroundColor: isOcupado ? '#94a3b8' : '#1e293b', color: 'white', border: 'none', borderRadius: '8px', cursor: isOcupado ? 'not-allowed' : 'pointer', flex: 1 }}
+              >
+                ESVAZIAR
+              </button>
+            </div>
+            
+            <button 
+              onClick={() => client.publish('tanque/comando', JSON.stringify({ acao: "PARAR" }))}
+              style={{ marginTop: '20px', width: '100%', padding: '15px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              PARADA DE EMERGÊNCIA (SOBRESCREVE TRAVA)
+            </button>
           </div>
-          <button 
-            onClick={() => client.publish('tanque/comando', JSON.stringify({ acao: "PARAR" }))}
-            style={{ marginTop: '20px', width: '100%', padding: '15px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-          >
-            PARAR TUDO
-          </button>
+
+          {/* PAINEL DE ENGENHARIA / CALIBRAÇÃO */}
+          <div style={{ backgroundColor: '#fffbeb', padding: '20px', borderRadius: '12px', border: '1px solid #fde68a' }}>
+            <h3 style={{ marginTop: 0, color: '#b45309' }}>Ajuste de Calibração (Hardware Flash)</h3>
+            <p style={{ fontSize: '0.85rem', color: '#78350f' }}>Altere os parâmetros físicos e sincronize com a memória do ESP32.</p>
+            
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', color: '#92400e' }}>Vol. Máximo (L)</label>
+                <input type="number" value={configDB.max} onChange={(e) => setConfigDB({...configDB, max: e.target.value})} style={{ width: '100%', padding: '8px' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', color: '#92400e' }}>Dist. Vazio (cm)</label>
+                <input type="number" value={configDB.vazio} onChange={(e) => setConfigDB({...configDB, vazio: e.target.value})} style={{ width: '100%', padding: '8px' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', color: '#92400e' }}>Dist. Cheio (cm)</label>
+                <input type="number" value={configDB.cheio} onChange={(e) => setConfigDB({...configDB, cheio: e.target.value})} style={{ width: '100%', padding: '8px' }} />
+              </div>
+            </div>
+            
+            <button 
+              onClick={dispararCalibracao}
+              style={{ width: '100%', padding: '10px', backgroundColor: '#b45309', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              SINCRONIZAR CALIBRAÇÃO (SYNC_CONFIG)
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
