@@ -1,5 +1,6 @@
 #include <Arduino.h>
-#include "Config.h"
+//#include "Config.h"
+#include "HardwareMap.h" // - Necessário para PIN_TRIGGER, ECHO e SENSOR_SAMPLES
 #include "TankPhysics.h"
 
 TankPhysics::TankPhysics() : _readIndex(0), _total(0), _average(0) {

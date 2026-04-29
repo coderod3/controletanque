@@ -1,3 +1,4 @@
+#include "HardwareMap.h"
 #include "DisplayManager.h"
 
 DisplayManager::DisplayManager() : _lcd(0x27, 16, 2) {}

@@ -1,5 +1,6 @@
 #include <Arduino.h>
-#include "Config.h"
+//#include "Config.h"
+#include "HardwareMap.h" 
 #include "InputManager.h"
 
 InputManager::InputManager() {

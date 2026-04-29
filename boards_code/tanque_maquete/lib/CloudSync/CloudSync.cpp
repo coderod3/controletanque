@@ -7,10 +7,11 @@ void CloudSync::syncDigitalTwin(String status, float nivel) {
     if (WiFi.status() != WL_CONNECTED) return;
 
     HTTPClient http;
-    http.begin(_baseUrl + "/telemetria/status");
+    // Corrigido para a URL sem hífen conforme seu deploy
+    http.begin(_baseUrl + "/telemetria/status"); 
     http.addHeader("Content-Type", "application/json");
 
-    StaticJsonDocument<128> doc;
+    JsonDocument doc; // ArduinoJson V7
     doc["status"] = status;
     doc["nivel"] = nivel;
 
@@ -27,7 +28,7 @@ void CloudSync::sendAuditLog(String rfid, String acao, float volume, float anter
     http.begin(_baseUrl + "/telemetria/auditoria");
     http.addHeader("Content-Type", "application/json");
 
-    StaticJsonDocument<256> doc;
+    JsonDocument doc; // ArduinoJson V7
     doc["rfid_uid"] = rfid;
     doc["acao"] = acao;
     doc["volume"] = volume;

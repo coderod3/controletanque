@@ -3,6 +3,7 @@
 
 #include <Preferences.h> // Necessário para persistência flash
 #include "Config.h"      //
+#include "HardwareMap.h" // - Necessário para SENSOR_SAMPLES
 
 class TankPhysics {
 public:

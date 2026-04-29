@@ -2,12 +2,15 @@
 #include <SPI.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include "Config.h"
+
+#include "Config.h"       // Credenciais
+#include "HardwareMap.h" // - Essencial para os pinos
 #include "AuthService.h"
 
 AuthService::AuthService() : _mfrc522(PIN_RFID_SS, PIN_RFID_RST), _authorized(false), _activeUserID("") {}
 
 void AuthService::init() {
+    // Usa os pinos definidos no HardwareMap.h
     SPI.begin(PIN_RFID_SCK, PIN_RFID_MISO, PIN_RFID_MOSI, PIN_RFID_SS);
     _mfrc522.PCD_Init();
     Serial.println("[Auth] RFID Online.");
@@ -16,10 +19,8 @@ void AuthService::init() {
 bool AuthService::update() {
     if (_authorized) return true;
 
-    // Detecta nova tag
     if (!_mfrc522.PICC_IsNewCardPresent() || !_mfrc522.PICC_ReadCardSerial()) return false;
 
-    // Converte UID para String Hex
     String uid = "";
     for (byte i = 0; i < _mfrc522.uid.size; i++) {
         uid += String(_mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
@@ -31,12 +32,11 @@ bool AuthService::update() {
 
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        // Caminho exato que você criou
         http.begin("https://controletanque.vercel.app/api/auth/auth");
         http.addHeader("Content-Type", "application/json");
 
-        // Prepara o JSON seguro
-        StaticJsonDocument<128> doc;
+        // ArduinoJson V7: Usa JsonDocument em vez de StaticJsonDocument
+        JsonDocument doc; 
         doc["tag_id"] = uid;
         String jsonBody;
         serializeJson(doc, jsonBody);
@@ -45,16 +45,16 @@ bool AuthService::update() {
 
         if (httpCode == 200) {
             String response = http.getString();
-            StaticJsonDocument<200> resDoc;
+            JsonDocument resDoc; // ArduinoJson V7
             deserializeJson(resDoc, response);
             
             _authorized = true;
             _activeUserID = uid;
-            _activeUserName = resDoc["nome"].as<String>(); // SALVA O NOME AQUI
+            _activeUserName = resDoc["nome"].as<String>();
             Serial.printf("[Auth] Bem-vindo: %s (%s)\n", resDoc["nome"].as<const char*>(), resDoc["cargo"].as<const char*>());
         } else {
             Serial.println("[Auth] Acesso negado. Código: " + String(httpCode));
-            delay(1000); // Evita múltiplas tentativas imediatas
+            delay(1000);
         }
         http.end();
     }

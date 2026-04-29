@@ -16,7 +16,7 @@ public:
     void sendAuditLog(String rfid, String acao, float volume, float anterior, float atual);
 
 private:
-    const String _baseUrl = "https://controle-tanque.vercel.app/api"; // Centralize sua URL aqui
+    const String _baseUrl = "https://controletanque.vercel.app/pages/api"; // Centralize sua URL aqui
 };
 
 extern CloudSync cloud; // Instância global para ser usada no main
