@@ -2,33 +2,34 @@
 #define AUTH_SERVICE_H
 
 #include <Arduino.h>
-#include "Config.h"
 
 class AuthService {
 public:
     AuthService();
     
-    // Inicializa a lógica de autenticação
     void init();
     
-    // Orquestra a leitura da tag e validação na nuvem
-    bool update(); 
+    // Chamado no loop principal do Core 1. Retorna true se estiver autorizado.
+    bool update();
     
-    // Getters de estado
+    // Nova função: O Core 1 chamará isso quando a resposta da rede chegar pela fila
+    void processValidationResponse(bool isAuthorized, String userName);
+    
+    void logout();
+    
     bool isAuthorized();
+    bool isValidating(); // Novo: Para o Display mostrar "Aguarde..."
     String getActiveUserID();
     String getActiveUserName();
 
-    // Encerra a sessão atual
-    void logout();
-
 private:
     bool _authorized;
+    bool _isValidating; // Evita spam de requisições
+    String _pendingUID; // Guarda o UID que está sendo validado no momento
     String _activeUserID;
     String _activeUserName;
 };
 
-// Instância global
 extern AuthService auth;
 
 #endif

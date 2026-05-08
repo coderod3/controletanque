@@ -21,11 +21,14 @@ public:
 
     // Mantido para compatibilidade com o resto do sistema
     // Agora envia via MQTT no tópico de telemetria/eventos
-    void queueLog(String message);
-
+    bool queueLog(String message, bool isError = false);
+    
     // Retorna o comando vindo do Dashboard (ex: "LIGAR", "PARAR")
     // O Core 1 chama isso para saber o que o site mandou
     String getPendingCommand();
+    
+    bool queueAuthRequest(String rfid_uid);
+    bool readAuthResponse(bool& isAuthorized, String& userName);
 
 private:
     // O loop de rede que rodará no Core 0
@@ -49,5 +52,5 @@ private:
 
 // Instância global para ser usada em todo o projeto
 extern WiFiService connectivity;
-
+extern QueueHandle_t authRxQueue; // Nova fila para respostas do RFID
 #endif

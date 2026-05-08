@@ -1,75 +1,71 @@
-#include <Arduino.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-
-#include "Config.h"
-#include "HardwareMap.h"
 #include "AuthService.h"
-#include "RFIDReader.h" // Agora depende apenas da nossa abstração
+#include "RFIDReader.h" // Depende apenas da abstração do hardware local
+#include "WiFiService.h" // Para usar as filas de rede
 
-AuthService::AuthService() : _authorized(false), _activeUserID(""), _activeUserName("") {}
+AuthService::AuthService() : _authorized(false), _isValidating(false), _activeUserID(""), _activeUserName("") {}
 
 void AuthService::init() {
-    // Inicializa o driver físico (seja ele PN532 ou RC522)
     rfidReader.init(); 
-    Serial.println("[Auth] Serviço de Autenticação Online.");
+    Serial.println("[Auth] Serviço de Autenticação Híbrido Iniciado.");
 }
 
 bool AuthService::update() {
-    // Se já estiver autorizado, não precisa validar novamente
+    // 1. Já está autorizado? Segue a vida.
     if (_authorized) return true;
 
-    // Pergunta ao HAL se existe uma tag presente
-    String uid = rfidReader.readTag();
-
-    // Se o UID estiver vazio, não há nada para validar
-    if (uid == "") return false;
-
-    Serial.println("[Auth] Tag detectada: " + uid + ". Validando na Vercel...");
-
-    // Inicia a validação via API se houver conexão WiFi
-    if (WiFi.status() == WL_CONNECTED) {
-        HTTPClient http;
-        http.begin("https://controle-tanque.vercel.app/api/auth/auth"); // URL ajustada conforme repositório[cite: 1]
-        http.addHeader("Content-Type", "application/json");
-
-        // Prepara o JSON para a API (ArduinoJson V7)
-        JsonDocument doc; 
-        doc["tag_id"] = uid;
-        String jsonBody;
-        serializeJson(doc, jsonBody);
-
-        int httpCode = http.POST(jsonBody);
-
-        if (httpCode == 200) {
-            String response = http.getString();
-            JsonDocument resDoc;
-            deserializeJson(resDoc, response);
-            
-            _authorized = true;
-            _activeUserID = uid;
-            _activeUserName = resDoc["nome"].as<String>();
-            
-            Serial.printf("[Auth] Bem-vindo: %s\n", _activeUserName.c_str());
-        } else {
-            Serial.println("[Auth] Acesso negado. Código HTTP: " + String(httpCode));
+    // 2. Está esperando a Vercel responder? Checa a fila assíncrona.
+    if (_isValidating) {
+        bool isAuth = false;
+        String nome = "";
+        
+        // Pergunta ao WiFiService se a resposta já chegou (não trava o loop)
+        if (connectivity.readAuthResponse(isAuth, nome)) {
+            processValidationResponse(isAuth, nome);
         }
-        http.end();
-    } else {
-        Serial.println("[Auth] Erro: Sem conexão WiFi para validar tag.");
+        return false; // Continua false até a resposta chegar e ser positiva
     }
 
-    return _authorized;
+    // 3. Lê o Hardware Físico
+    String uid = rfidReader.readTag();
+
+    // Se não passou cartão nenhum, sai instantaneamente.
+    if (uid == "") return false;
+
+    // 4. Cartão passado! Joga na fila de rede e entra em estado de espera
+    Serial.println("[Auth] Tag detectada: " + uid + ". Validando na nuvem em background...");
+    
+    _isValidating = true;
+    _pendingUID = uid;
+    
+    connectivity.queueAuthRequest(uid); 
+
+    return false;
+}
+
+void AuthService::processValidationResponse(bool isAuthorized, String userName) {
+    _isValidating = false; // Libera o leitor para novas tentativas
+
+    if (isAuthorized) {
+        _authorized = true;
+        _activeUserID = _pendingUID;
+        _activeUserName = userName;
+        Serial.printf("[Auth] Acesso Liberado. Bem-vindo: %s\n", _activeUserName.c_str());
+    } else {
+        Serial.println("[Auth] Acesso Negado pela nuvem.");
+        _pendingUID = "";
+    }
 }
 
 void AuthService::logout() {
     _authorized = false;
+    _isValidating = false;
     _activeUserID = "";
     _activeUserName = "";
     Serial.println("[Auth] Sessão encerrada.");
 }
 
 bool AuthService::isAuthorized() { return _authorized; }
+bool AuthService::isValidating() { return _isValidating; }
 String AuthService::getActiveUserID() { return _activeUserID; }
 String AuthService::getActiveUserName() { return _activeUserName; }
 
