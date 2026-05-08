@@ -33,6 +33,9 @@ private:
     // Variáveis para evitar refresh desnecessário (flicker)
     float _lastVolume;
     int _lastState;
+    // Adicione estes dois:
+    String _lastLine1; 
+    String _lastLine2;
 };
 
 extern DisplayManager display;

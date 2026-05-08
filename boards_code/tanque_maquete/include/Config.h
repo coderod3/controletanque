@@ -36,8 +36,11 @@
 // =============================================================================
 // CONFIGURAÇÕES DE REDE (Onde estavam os erros)
 // =============================================================================
-#define WIFI_SSID         "Wokwi-GUEST"
-#define WIFI_PASSWORD     ""
+//#define WIFI_SSID         "Wokwi-GUEST"
+//#define WIFI_PASSWORD     ""
+
+#define WIFI_SSID         "rodrigowifi"
+#define WIFI_PASSWORD     "3635840331"
 
 #define MQTT_SERVER       "b5dfbf70844741db84d31800c3bd77a0.s1.eu.hivemq.cloud"
 #define MQTT_PORT         8883            // Porta segura para o ESP32
@@ -48,5 +51,8 @@
 // Tópicos de comunicação
 #define TOPIC_TELEMETRIA  "tanque/telemetria"
 #define TOPIC_COMANDO     "tanque/comando"
+
+// Comente esta linha para mudar para o EMULADOR
+// #define AMBIENTE_REAL 
 
 #endif // CONFIG_H

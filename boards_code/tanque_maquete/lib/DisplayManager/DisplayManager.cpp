@@ -11,11 +11,23 @@ void DisplayManager::init() {
 }
 
 void DisplayManager::showStatus(String line1, String line2) {
-    _lcd.clear();
+    // Se o que eu quero escrever é igual ao que já está lá, não faço nada!
+    if (line1 == _lastLine1 && line2 == _lastLine2) {
+        return; 
+    }
+
+    // Se chegou aqui, algo mudou. Atualizamos o cache e a tela.
+    _lastLine1 = line1;
+    _lastLine2 = line2;
+
+    // Removemos o clear() para eliminar o flicker de vez
     _lcd.setCursor(0, 0);
-    _lcd.print(line1);
+    String p1 = line1 + "                "; 
+    _lcd.print(p1.substring(0, 16));
+    
     _lcd.setCursor(0, 1);
-    _lcd.print(line2);
+    String p2 = line2 + "                ";
+    _lcd.print(p2.substring(0, 16));
 }
 
 void DisplayManager::showIdle(float volume) {

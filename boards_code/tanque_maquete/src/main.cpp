@@ -1,108 +1,91 @@
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include "HardwareMap.h"
-#include "Config.h"
 
-// Inclusão dos módulos isolados (agora na pasta lib/)
-#include "TankPhysics.h"
-#include "DisplayManager.h"
-#include "WiFiService.h"
-#include "AuthService.h"
-#include "InputManager.h"
-#include "CloudSync.h"
-#include "TankController.h"
+// --- DEFINE OS PINOS DE SAÍDA (LIGADOS AO NANO) ---
+#define PINO_ESP_ENCHER 16  // Envia 3.3V para o pino D5 do Nano
+#define PINO_ESP_ESVAZ  17  // Envia 3.3V para o pino D6 do Nano
 
-// Protótipo da função de comunicação
-void handleCommunication();
+// --- DEFINE OS PINOS DOS BOTÕES ---
+#define BTN_ENCHER 13       // Botão 1 - Aciona Bomba de Encher
+#define BTN_ESVAZ  32       // Botão 2 - Aciona Bomba de Esvaziar
+#define BTN_AMBOS  33       // Botão 3 - Aciona AMBAS as bombas
 
-// =============================================================================
-// SETUP
-// =============================================================================
+// --- CONFIGURAÇÃO DA LÓGICA DE INSTALAÇÃO DOS BOTÕES ---
+// true  = Botão ligado direto no GND (Ativo em LOW - Usa resistores internos do ESP32)
+// false = Botão ligado no 3.3V com resistor pull-down externo (Ativo em HIGH)
+const bool USAR_PULLUP_INTERNO = true; 
+
 void setup() {
-    Serial.begin(115200);
-    
-    // Inicialização modular de todos os serviços
-    tank.init();
-    display.init();
-    connectivity.init(); 
-    auth.init();
-    inputs.init();
-    controller.init(); // Inicializa FSM, Bombas e Volume Virtual
+  Serial.begin(115200);
+  Serial.println("\n--- INICIANDO TESTE: ESP32 -> NANO -> MOSFET -> BOMBAS ---");
 
-    // Configuração de interrupção de hardware (Transbordamento)
-    // Usamos uma função lambda para chamar o método de emergência do controller
-    pinMode(PIN_OVERFLOW, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(PIN_OVERFLOW), []() {
-        controller.emergencyStop();
-    }, FALLING);
+  // Configura os pinos de sinal para o Nano como saídas
+  pinMode(PINO_ESP_ENCHER, OUTPUT);
+  pinMode(PINO_ESP_ESVAZ, OUTPUT);
 
-    display.showStatus("NEXUS OS", "SISTEMA ONLINE");
+  // Garante que as bombas comecem desligadas
+  digitalWrite(PINO_ESP_ENCHER, LOW);
+  digitalWrite(PINO_ESP_ESVAZ, LOW);
+
+  // Configuração dos pinos de entrada dos botões
+  if (USAR_PULLUP_INTERNO) {
+    pinMode(BTN_ENCHER, INPUT_PULLUP);
+    pinMode(BTN_ESVAZ, INPUT_PULLUP);
+    pinMode(BTN_AMBOS, INPUT_PULLUP);
+    Serial.println("Botões configurados em modo INPUT_PULLUP (Ativos em nível LOW/GND).");
+  } else {
+    pinMode(BTN_ENCHER, INPUT);
+    pinMode(BTN_ESVAZ, INPUT);
+    pinMode(BTN_AMBOS, INPUT);
+    Serial.println("Botões configurados em modo INPUT comum (Ativos em nível HIGH/3.3V).");
+  }
 }
 
-// =============================================================================
-// LOOP PRINCIPAL
-// =============================================================================
 void loop() {
-    // 1. Atualização dos Sensores Físicos
-    tank.update();
+  bool btnEncherPressionado = false;
+  bool btnEsvazPressionado = false;
+  bool btnAmbosPressionado = false;
 
-    // 2. Atualização das Entradas do Usuário (Botões e RFID)
-    inputs.update();
+  // Realiza a leitura com base na lógica física definida
+  if (USAR_PULLUP_INTERNO) {
+    // Com INPUT_PULLUP, apertar o botão fecha curto com o GND, retornando LOW
+    btnEncherPressionado = (digitalRead(BTN_ENCHER) == LOW);
+    btnEsvazPressionado  = (digitalRead(BTN_ESVAZ) == LOW);
+    btnAmbosPressionado  = (digitalRead(BTN_AMBOS) == LOW);
+  } else {
+    // Com pull-down físico externo, apertar o botão joga 3.3V no pino, retornando HIGH
+    btnEncherPressionado = (digitalRead(BTN_ENCHER) == HIGH);
+    btnEsvazPressionado  = (digitalRead(BTN_ESVAZ) == HIGH);
+    btnAmbosPressionado  = (digitalRead(BTN_AMBOS) == HIGH);
+  }
 
-    // 3. Gerenciamento de Comunicação MQTT e Telemetria
-    handleCommunication();
+  // --- LÓGICA DE ACIONAMENTO ---
 
-    // 4. Processamento da Inteligência e Controle (Máquina de Estados)
-    controller.update();
-}
+  if (btnAmbosPressionado) {
+    // Botão 3: Prioridade máxima. Liga ambas as bombas enquanto segurar
+    digitalWrite(PINO_ESP_ENCHER, HIGH);
+    digitalWrite(PINO_ESP_ESVAZ, HIGH);
+    Serial.println("[COMANDO] Botão Ambos pressionado: Ativando tudo.");
+  } 
+  else {
+    // Se o botão de acionamento duplo estiver solto, controla individualmente
 
-// =============================================================================
-// ROTEAMENTO DE COMUNICAÇÃO (MQTT -> CONTROLLER)
-// =============================================================================
-void handleCommunication() {
-    // 1. Publicação de Telemetria (A cada 2 segundos)
-    static unsigned long lastPub = 0;
-    if (millis() - lastPub > 2000) { 
-        connectivity.publishTelemetria(tank.getVolume(), auth.getActiveUserName());
-        lastPub = millis();
+    // Controle Bomba de Encher (Botão 1)
+    if (btnEncherPressionado) {
+      digitalWrite(PINO_ESP_ENCHER, HIGH);
+      Serial.println("[COMANDO] Botão 1 pressionado: Ligando Bomba Encher (Pino 16).");
+    } else {
+      digitalWrite(PINO_ESP_ENCHER, LOW);
     }
 
-    // 2. Processamento de comandos recebidos via MQTT
-    String jsonRaw = connectivity.getPendingCommand();
-    if (jsonRaw != "") {
-        StaticJsonDocument<256> doc;
-        DeserializationError error = deserializeJson(doc, jsonRaw);
-        
-        if (error) {
-            connectivity.queueLog("ERRO_JSON_REMOTE");
-            return;
-        }
-
-        String acao = doc["acao"] | "";
-
-        // Roteamento de comandos para os métodos públicos do TankController
-        if (acao == "PARAR" || acao == "DESLIGAR") {
-            controller.emergencyStop();
-            connectivity.queueLog("STOP_REMOTO_EXECUTADO");
-        } 
-        else if (acao == "EXECUTAR") {
-            float vol = doc["volume"] | 0.0;
-            bool encher = doc["encher"] | true;
-            controller.addJob(vol, encher, "REMOTO");
-        }
-        else if (acao == "SYNC_CONFIG") {
-            // Sincroniza calibração no módulo de Física
-            tank.syncConfig(
-                doc["max_volume"] | tank.getMaxVolume(), 
-                doc["dist_vazio"] | tank.getRawDistance(), 
-                doc["dist_cheio"] | 1.0
-            );
-            
-            // Força o controlador a reajustar o volume virtual
-            controller.forceSyncVirtual();
-            
-            connectivity.queueLog("CONFIG_SYNC_OK");
-            display.showStatus("CALIBRADO", String(tank.getMaxVolume()) + "L OK");
-        }
+    // Controle Bomba de Esvaziar (Botão 2)
+    if (btnEsvazPressionado) {
+      digitalWrite(PINO_ESP_ESVAZ, HIGH);
+      Serial.println("[COMANDO] Botão 2 pressionado: Ligando Bomba Esvaziar (Pino 17).");
+    } else {
+      digitalWrite(PINO_ESP_ESVAZ, LOW);
     }
+  }
+
+  // Pequeno delay para evitar bouncing mecânico dos botões e poluição no serial
+  delay(30); 
 }

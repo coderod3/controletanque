@@ -1,36 +1,34 @@
 #ifndef AUTH_SERVICE_H
 #define AUTH_SERVICE_H
 
-#include <SPI.h>
-#include <MFRC522.h>
-#include "Config.h" // Corrigido para C maiúsculo
+#include <Arduino.h>
+#include "Config.h"
 
 class AuthService {
 public:
     AuthService();
     
+    // Inicializa a lógica de autenticação
     void init();
     
-    // Agora valida a tag via POST para a Vercel/Neon
+    // Orquestra a leitura da tag e validação na nuvem
     bool update(); 
     
-    // Getters para a Máquina de Estados
+    // Getters de estado
     bool isAuthorized();
     String getActiveUserID();
-    
-    // Encerra a sessão
+    String getActiveUserName();
+
+    // Encerra a sessão atual
     void logout();
 
-    String getActiveUserName(); // Novo método
-
 private:
-    MFRC522 _mfrc522;
     bool _authorized;
     String _activeUserID;
-    // _checkWhitelist removido: a validação agora é externa (API)
-    String _activeUserName; // Nova variável
+    String _activeUserName;
 };
 
+// Instância global
 extern AuthService auth;
 
 #endif

@@ -71,4 +71,17 @@ bool InputManager::isConfClicked() {
     return false;
 }
 
+bool InputManager::isIncPressed() {
+    // Retorna true se o estado estável atual for LOW (pressionado)
+    return (_btnInc.currentState == LOW); 
+}
+
+bool InputManager::isDecPressed() {
+    return (_btnDec.currentState == LOW);
+}
+
+bool InputManager::isConfPressed() {
+    return (_btnConf.currentState == LOW);
+}
+
 InputManager inputs;

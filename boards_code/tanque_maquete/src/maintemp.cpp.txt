@@ -1,0 +1,95 @@
+#include <Arduino.h>
+#include "DisplayManager.h"
+#include "TankPhysics.h"
+#include "InputManager.h"
+#include "RFIDReader.h" 
+#include "Config.h"
+#include "HardwareMap.h" // Necessário para acessar os PIN_LED e PIN_OVERFLOW
+
+// Variáveis de controle
+unsigned long timerBotao = 0;
+String msgBotao = "";
+unsigned long timerRFID = 0;
+String lastUID = "";
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Inicialização dos módulos base
+    display.init();   
+    tank.init();     
+    inputs.init();   
+    rfidReader.init(); 
+
+    // Configuração manual dos novos componentes de teste
+    pinMode(PIN_LED_R, OUTPUT);
+    pinMode(PIN_LED_G, OUTPUT);
+    pinMode(PIN_LED_B, OUTPUT);
+    pinMode(PIN_OVERFLOW, INPUT_PULLUP); // Botão de Emergência
+
+    Serial.println("--- NEXUS: TESTE INTEGRAL DE HARDWARE ---");
+}
+
+void loop() {
+    // 1. Atualização dos sensores e dispositivos
+    tank.update();
+    inputs.update();
+    
+    // 2. Leitura do Botão de Emergência (Lógica Inversa: PULLUP)
+    bool emergencia = (digitalRead(PIN_OVERFLOW) == LOW);
+
+    // 3. Controle do LED RGB baseado nos botões (Ligado enquanto pressiona)
+    // INC -> Vermelho | DEC -> Verde | CONF -> Azul
+    digitalWrite(PIN_LED_R, inputs.isIncPressed() ? HIGH : LOW);
+    digitalWrite(PIN_LED_G, inputs.isDecPressed() ? HIGH : LOW);
+    digitalWrite(PIN_LED_B, inputs.isConfPressed() ? HIGH : LOW);
+
+    // 4. Leitura do RFID
+    String currentUID = rfidReader.readTag();
+    if (currentUID != "") {
+        lastUID = currentUID;
+        timerRFID = millis();
+    }
+
+    // 5. Captura de Cliques
+    if (inputs.isIncClicked())  { msgBotao = "INCREMENTAR"; timerBotao = millis(); }
+    if (inputs.isDecClicked())  { msgBotao = "DECREMENTAR"; timerBotao = millis(); }
+    if (inputs.isConfClicked()) { msgBotao = "CONFIRMAR";   timerBotao = millis(); }
+
+    // 6. Lógica de Exibição por Prioridade
+
+    // PRIORIDADE 0: Emergência (Overflow)
+    if (emergencia) {
+        display.showStatus("!!! PERIGO !!!", "EMERGENCIA ATIVA");
+        // Pisca Vermelho na emergência como alerta visual extra
+        digitalWrite(PIN_LED_R, (millis() % 200 < 100)); 
+    }
+    // PRIORIDADE 1: Segurando botões
+    else if (inputs.isIncPressed()) {
+        display.showStatus("SEGURANDO...", "[ + ] RED"); 
+    } 
+    else if (inputs.isDecPressed()) {
+        display.showStatus("SEGURANDO...", "[ - ] GREEN");
+    } 
+    else if (inputs.isConfPressed()) {
+        display.showStatus("SEGURANDO...", "[ OK ] BLUE");
+    }
+    // PRIORIDADE 2: RFID (4 segundos)
+    else if (millis() - timerRFID < 4000 && timerRFID != 0) {
+        display.showStatus("TAG DETECTADA:", lastUID);
+    }
+    // PRIORIDADE 3: Clique rápido
+    else if (millis() - timerBotao < 1000 && timerBotao != 0) {
+        display.showStatus("CLICADO:", msgBotao);
+    }
+    // PRIORIDADE 4: Monitoramento padrão
+    else {
+        timerBotao = 0;
+        display.showStatus(
+            "VOL: " + String(tank.getVolume(), 1) + "L",
+            "DIST: " + String(tank.getRawDistance(), 1) + "cm"
+        );
+    }
+
+    delay(20); 
+}

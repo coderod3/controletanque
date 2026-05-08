@@ -1,41 +1,39 @@
 #include <Arduino.h>
-#include <SPI.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-#include "Config.h"       // Credenciais
-#include "HardwareMap.h" // - Essencial para os pinos
+#include "Config.h"
+#include "HardwareMap.h"
 #include "AuthService.h"
+#include "RFIDReader.h" // Agora depende apenas da nossa abstração
 
-AuthService::AuthService() : _mfrc522(PIN_RFID_SS, PIN_RFID_RST), _authorized(false), _activeUserID("") {}
+AuthService::AuthService() : _authorized(false), _activeUserID(""), _activeUserName("") {}
 
 void AuthService::init() {
-    // Usa os pinos definidos no HardwareMap.h
-    SPI.begin(PIN_RFID_SCK, PIN_RFID_MISO, PIN_RFID_MOSI, PIN_RFID_SS);
-    _mfrc522.PCD_Init();
-    Serial.println("[Auth] RFID Online.");
+    // Inicializa o driver físico (seja ele PN532 ou RC522)
+    rfidReader.init(); 
+    Serial.println("[Auth] Serviço de Autenticação Online.");
 }
 
 bool AuthService::update() {
+    // Se já estiver autorizado, não precisa validar novamente
     if (_authorized) return true;
 
-    if (!_mfrc522.PICC_IsNewCardPresent() || !_mfrc522.PICC_ReadCardSerial()) return false;
+    // Pergunta ao HAL se existe uma tag presente
+    String uid = rfidReader.readTag();
 
-    String uid = "";
-    for (byte i = 0; i < _mfrc522.uid.size; i++) {
-        uid += String(_mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
-        uid += String(_mfrc522.uid.uidByte[i], HEX);
-    }
-    uid.toUpperCase();
+    // Se o UID estiver vazio, não há nada para validar
+    if (uid == "") return false;
 
-    Serial.println("[Auth] Validando na nuvem: " + uid);
+    Serial.println("[Auth] Tag detectada: " + uid + ". Validando na Vercel...");
 
+    // Inicia a validação via API se houver conexão WiFi
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        http.begin("https://controletanque.vercel.app/api/auth/auth");
+        http.begin("https://controle-tanque.vercel.app/api/auth/auth"); // URL ajustada conforme repositório[cite: 1]
         http.addHeader("Content-Type", "application/json");
 
-        // ArduinoJson V7: Usa JsonDocument em vez de StaticJsonDocument
+        // Prepara o JSON para a API (ArduinoJson V7)
         JsonDocument doc; 
         doc["tag_id"] = uid;
         String jsonBody;
@@ -45,32 +43,34 @@ bool AuthService::update() {
 
         if (httpCode == 200) {
             String response = http.getString();
-            JsonDocument resDoc; // ArduinoJson V7
+            JsonDocument resDoc;
             deserializeJson(resDoc, response);
             
             _authorized = true;
             _activeUserID = uid;
             _activeUserName = resDoc["nome"].as<String>();
-            Serial.printf("[Auth] Bem-vindo: %s (%s)\n", resDoc["nome"].as<const char*>(), resDoc["cargo"].as<const char*>());
+            
+            Serial.printf("[Auth] Bem-vindo: %s\n", _activeUserName.c_str());
         } else {
-            Serial.println("[Auth] Acesso negado. Código: " + String(httpCode));
-            delay(1000);
+            Serial.println("[Auth] Acesso negado. Código HTTP: " + String(httpCode));
         }
         http.end();
+    } else {
+        Serial.println("[Auth] Erro: Sem conexão WiFi para validar tag.");
     }
 
-    _mfrc522.PICC_HaltA();
-    _mfrc522.PCD_StopCrypto1();
     return _authorized;
 }
 
 void AuthService::logout() {
     _authorized = false;
     _activeUserID = "";
-    Serial.println("[Auth] Logoff realizado.");
+    _activeUserName = "";
+    Serial.println("[Auth] Sessão encerrada.");
 }
 
 bool AuthService::isAuthorized() { return _authorized; }
 String AuthService::getActiveUserID() { return _activeUserID; }
 String AuthService::getActiveUserName() { return _activeUserName; }
+
 AuthService auth;

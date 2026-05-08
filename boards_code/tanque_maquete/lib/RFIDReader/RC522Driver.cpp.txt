@@ -1,0 +1,36 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include "RFIDReader.h"
+#include "HardwareMap.h"
+
+// Driver específico para o chip RC522 (Emulador)
+MFRC522 _mfrc522(PIN_RFID_SS, PIN_RFID_RST);
+
+RFIDReader::RFIDReader() {}
+
+void RFIDReader::init() {
+    SPI.begin(PIN_RFID_SCK, PIN_RFID_MISO, PIN_RFID_MOSI, PIN_RFID_SS);
+    _mfrc522.PCD_Init();
+    Serial.println("[RFID] Driver RC522 (EMULADOR) pronto.");
+}
+
+String RFIDReader::readTag() {
+    if (!_mfrc522.PICC_IsNewCardPresent() || !_mfrc522.PICC_ReadCardSerial()) {
+        return "";
+    }
+
+    String uid = "";
+    for (byte i = 0; i < _mfrc522.uid.size; i++) {
+        uid += String(_mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
+        uid += String(_mfrc522.uid.uidByte[i], HEX);
+    }
+    uid.toUpperCase();
+
+    _mfrc522.PICC_HaltA();
+    _mfrc522.PCD_StopCrypto1();
+
+    return uid;
+}
+
+RFIDReader rfidReader;

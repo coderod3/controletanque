@@ -27,6 +27,11 @@ public:
     bool isDecClicked();
     bool isConfClicked();
 
+    // checa se está pressionado
+    bool isIncPressed();
+    bool isDecPressed();
+    bool isConfPressed();
+
 private:
     Button _btnInc;
     Button _btnDec;
