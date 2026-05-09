@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 #include "Config.h"
 #include "WiFiService.h"
@@ -10,6 +12,7 @@
 // Declaração das filas globais do FreeRTOS
 QueueHandle_t txQueue = NULL;
 QueueHandle_t rxQueue = NULL;
+QueueHandle_t authRxQueue = NULL; // <-- ADICIONE ESTA LINHA
 
 WiFiService::WiFiService() : _connected(false) {}
 
@@ -121,6 +124,22 @@ void WiFiService::_networkTask(void* pvParameters) {
     Serial.println("[Comm] Orquestrador de Rede iniciado no Core 0");
 
     WiFi.mode(WIFI_STA);
+
+    // --- CONFIGURAÇÃO DE IP ESTÁTICO ---
+    IPAddress local_IP(192, 168, 0, 115);
+    IPAddress gateway(192, 168, 0, 1);      
+    IPAddress subnet(255, 255, 255, 0);
+    IPAddress primaryDNS(8, 8, 8, 8);       
+    IPAddress secondaryDNS(8, 8, 4, 4);
+
+    if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+        Serial.println("[WiFi] Erro ao configurar IP Estático!");
+    } else {
+        Serial.println("[WiFi] IP Estático definido para: 192.168.0.115");
+    }
+    
+    // -----------------------------------
+
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     // Inicializa as configurações base do MQTT (ainda não conecta, só configura)
@@ -133,8 +152,15 @@ void WiFiService::_networkTask(void* pvParameters) {
         // --- 1. Manutenção de Conexão (Wi-Fi, OTA e MQTT) ---
         if (WiFi.status() == WL_CONNECTED) {
             if (!instance->_connected) {
-                Serial.println("[WiFi] Conectado!");
                 instance->_connected = true;
+                
+                Serial.println("\n====================================");
+                Serial.println("[WiFi] CONECTADO COM SUCESSO!");
+                Serial.print("[WiFi] IP ATUAL: ");
+                Serial.println(WiFi.localIP());
+                Serial.print("[WiFi] MAC ADDRESS: ");
+                Serial.println(WiFi.macAddress());
+                Serial.println("====================================\n");
                 
                 if (!otaSetupDone) {
                     OTAManager::init("nexus-tank-esp32");
@@ -185,7 +211,7 @@ void WiFiService::_networkTask(void* pvParameters) {
                         http.begin("https://controletanque.vercel.app/api/auth/auth");
                         http.addHeader("Content-Type", "application/json");
                         
-                        StaticJsonDocument<128> doc; 
+                        JsonDocument doc; 
                         doc["tag_id"] = pendingEvent.rfid_uid;
                         String jsonBody;
                         serializeJson(doc, jsonBody);
@@ -193,7 +219,7 @@ void WiFiService::_networkTask(void* pvParameters) {
                         int httpCode = http.POST(jsonBody);
                         if (httpCode == 200) {
                             String response = http.getString();
-                            StaticJsonDocument<200> resDoc;
+                            JsonDocument resDoc;
                             deserializeJson(resDoc, response);
                             authorized = true;
                             nome = resDoc["nome"].as<String>();

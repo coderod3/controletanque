@@ -36,7 +36,7 @@ void MQTTManager::handle() {
 void MQTTManager::publishTelemetria(float nivel, const char* operador) {
     if (!mqttClient.connected()) return;
     
-    StaticJsonDocument<128> doc;
+    JsonDocument doc;
     doc["nivel"] = nivel;
     doc["operador"] = operador;
     doc["timestamp"] = millis();
