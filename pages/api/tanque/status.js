@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const client = await db.connect();
 
   try {
-    // Busca o status atual e os parâmetros de calibração do banco
+    // Agora a consulta é direta e sem aliases gambiarras
     const { rows } = await client.sql`
       SELECT 
         status_operacional, 

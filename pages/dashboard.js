@@ -9,14 +9,14 @@ export default function DashboardPage() {
   const [volumeInput, setVolumeInput] = useState(10);
   const [operador, setOperador] = useState('Nenhum');
   
-  // NOVOS ESTADOS PARA O GÊMEO DIGITAL
+  // ESTADOS PARA O GÊMEO DIGITAL
   const [statusTanqueDB, setStatusTanqueDB] = useState('CARREGANDO...');
   const [configDB, setConfigDB] = useState({ max: 100, vazio: 100, cheio: 10 });
 
-  // FUNÇÃO PARA LER O BANCO DE DADOS
+  // FUNÇÃO PARA LER O BANCO DE DADOS (Rota Singular corrigida)
   const fetchDigitalTwin = async () => {
     try {
-      const res = await fetch('/api/tanques/status');
+      const res = await fetch('/api/tanque/status');
       if (res.ok) {
         const data = await res.json();
         setStatusTanqueDB(data.status_operacional);
@@ -38,7 +38,7 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // CONFIGURAÇÃO MQTT (Mantém a que você já tem)
+  // CONFIGURAÇÃO MQTT
   useEffect(() => {
     const host = process.env.NEXT_PUBLIC_MQTT_URL;
     if (!host) return;
@@ -72,20 +72,23 @@ export default function DashboardPage() {
     return () => { if (mqttClient) mqttClient.end(); };
   }, []);
 
-  // Ações
+  // Ações de Comando Remoto (Alinhado com TankController.cpp)
   const enviarComando = (vol, encher) => {
     if (client?.connected && statusTanqueDB === 'IDLE') {
+      const acao = encher ? "ENCHER" : "ESVAZIAR";
       client.publish('tanque/comando', JSON.stringify({
-        acao: "EXECUTAR", volume: parseFloat(vol), encher: encher
+        comando: acao, 
+        valor: parseFloat(vol)
       }));
     }
   };
 
+  // Ação de Calibração Remota (Alinhado com TankPhysics.cpp)
   const dispararCalibracao = () => {
     if (client?.connected) {
       client.publish('tanque/comando', JSON.stringify({
-        acao: "SYNC_CONFIG",
-        max_volume: parseFloat(configDB.max),
+        comando: "CALIBRAR",
+        max_vol: parseFloat(configDB.max),
         dist_vazio: parseFloat(configDB.vazio),
         dist_cheio: parseFloat(configDB.cheio)
       }));
@@ -93,7 +96,6 @@ export default function DashboardPage() {
     }
   };
 
-  // VARIÁVEL DE TRAVA (Bloqueia a UI se não estiver IDLE)
   const isOcupado = statusTanqueDB !== 'IDLE';
 
   return (
@@ -116,7 +118,6 @@ export default function DashboardPage() {
       </div>
       
       <div style={{ display: 'flex', gap: '50px', marginTop: '30px', alignItems: 'flex-start' }}>
-        {/* Componente Visual do Tanque */}
         <WaterTank nivel={nivel} />
         
         <div style={{ flex: 1 }}>
@@ -147,7 +148,7 @@ export default function DashboardPage() {
             </div>
             
             <button 
-              onClick={() => client.publish('tanque/comando', JSON.stringify({ acao: "PARAR" }))}
+              onClick={() => client.publish('tanque/comando', JSON.stringify({ comando: "PARAR" }))}
               style={{ marginTop: '20px', width: '100%', padding: '15px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
             >
               PARADA DE EMERGÊNCIA (SOBRESCREVE TRAVA)
