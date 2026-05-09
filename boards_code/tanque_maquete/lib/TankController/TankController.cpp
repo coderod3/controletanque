@@ -1,3 +1,4 @@
+#include <ArduinoJson.h>
 #include "TankController.h"
 #include "TankPhysics.h"
 #include "DisplayManager.h"
@@ -36,19 +37,82 @@ void TankController::init() {
 }
 
 void TankController::update() {
-    // 1. Verificações de Segurança de Hardware (Manutenção)
+    // 1. Verificações de Segurança de Hardware
     _checkMaintenanceConditions();
 
-    // 2. Execução da Máquina de Estados
+    // 2. Escuta Assíncrona de Comandos Remotos (Nuvem/MQTT)
+    _processRemoteCommands();
+
+    // 3. Execução da Máquina de Estados
     _handleStateMachine();
 
-    // 3. Atualização visual de Hardware (LEDs)
+    // 4. Atualização visual de Hardware (LEDs)
     _updateStatusLED();
+
+    // Envia telemetria a cada 1 segundo de forma assíncrona
+    _sendTelemetry();
 }
 
 // =============================================================================
 // MÉTODOS PÚBLICOS (INTERFACE DE COMANDO)
 // =============================================================================
+
+void TankController::_processRemoteCommands() {
+    IncomingCommand cmd;
+    
+    // Lê a fila de rede (retorna instantaneamente se estiver vazia)
+    if (connectivity.readPendingCommand(cmd)) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, cmd.payload);
+        
+        if (error) {
+            Serial.println("[Controller] Erro ao parsear JSON do comando MQTT");
+            return;
+        }
+
+        String comando = doc["comando"] | doc["command"] | ""; // Aceita as duas chaves
+        comando.toUpperCase();
+        
+        Serial.println("[Controller] Comando remoto recebido: " + comando);
+
+        if (comando == "ENCHER") {
+            addJob(doc["valor"].as<float>(), true, "WEB");
+        } 
+        else if (comando == "ESVAZIAR") {
+            addJob(doc["valor"].as<float>(), false, "WEB");
+        } 
+        else if (comando == "PARAR") {
+            emergencyStop();
+        } 
+        else if (comando == "RESET") {
+            if (_currentState == STATE_ERROR || _currentState == STATE_EMERGENCY) {
+                _currentState = STATE_IDLE;
+                _needsUpdate = true;
+                connectivity.queueLog("SISTEMA_RESETADO_VIA_WEB");
+            }
+        }
+        else if (comando == "ESTADO") {
+            forceSyncVirtual();
+            String statusStr = (_currentState == STATE_EXECUTING) ? "EXECUTANDO" : 
+                               (_currentState == STATE_ERROR) ? "ERRO" : "IDLE";
+            connectivity.queueDigitalTwin(statusStr, tank.getVolume());
+        }
+        // --- PASSO 2: CALIBRAÇÃO DINÂMICA VIA REDE ---
+        else if (comando == "CALIBRAR") {
+            float maxVol = doc["max_vol"];
+            float distVazio = doc["dist_vazio"];
+            float distCheio = doc["dist_cheio"];
+            
+            // Validação de segurança antes de aplicar na memória Flash
+            if (maxVol > 0 && distVazio > distCheio) {
+                tank.syncConfig(maxVol, distVazio, distCheio); // Grava na Flash e aplica
+                connectivity.queueLog("CALIBRACAO_ATUALIZADA");
+            } else {
+                connectivity.queueLog("ERRO_VALORES_CALIBRACAO_INVALIDOS", true);
+            }
+        }
+    }
+}
 
 void TankController::addJob(float vol, bool encher, String origem) {
     TankJob newJob = { vol, encher, origem };
@@ -308,5 +372,25 @@ void TankController::_updateStatusLED() {
         analogWrite(PIN_LED_B, enchendo ? 255 : 0);
     } else if (_currentState == STATE_EMERGENCY || _currentState == STATE_ERROR) {
         analogWrite(PIN_LED_R, 255); analogWrite(PIN_LED_G, 0); analogWrite(PIN_LED_B, 0);
+    }
+}
+
+void TankController::_sendTelemetry() {
+    // Dispara apenas a cada 1000 milissegundos (1 segundo)
+    if (millis() - _lastTelemetryTime >= 1000) {
+        _lastTelemetryTime = millis();
+        
+        // Traduz o estado numérico para string
+        String statusStr;
+        switch(_currentState) {
+            case STATE_IDLE: statusStr = "IDLE"; break;
+            case STATE_EXECUTING: statusStr = "EXECUTANDO"; break;
+            case STATE_ERROR: statusStr = "ERRO"; break;
+            case STATE_EMERGENCY: statusStr = "EMERGENCIA"; break;
+            default: statusStr = "DESCONHECIDO"; break;
+        }
+
+        // Envia para a Fila do MQTT (O Core 0 despacha para a nuvem em background)
+        connectivity.queueTelemetria(tank.getVolume(), statusStr);
     }
 }

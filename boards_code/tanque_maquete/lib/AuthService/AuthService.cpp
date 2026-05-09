@@ -1,54 +1,70 @@
 #include "AuthService.h"
-#include "RFIDReader.h" // Depende apenas da abstração do hardware local
-#include "WiFiService.h" // Para usar as filas de rede
+#include "RFIDReader.h" 
+#include "WiFiService.h" 
+#include "InputManager.h" // NOVO: Para detectar interações físicas
 
-AuthService::AuthService() : _authorized(false), _isValidating(false), _activeUserID(""), _activeUserName("") {}
+AuthService::AuthService() : 
+    _authorized(false), 
+    _isValidating(false), 
+    _activeUserID(""), 
+    _activeUserName(""),
+    _lastActivityTime(0) {}
 
 void AuthService::init() {
     rfidReader.init(); 
-    Serial.println("[Auth] Serviço de Autenticação Híbrido Iniciado.");
+    Serial.println("[Auth] Servico de Autenticacao Hibrido Iniciado.");
 }
 
 bool AuthService::update() {
-    // 1. Já está autorizado? Segue a vida.
-    if (_authorized) return true;
+    // 1. Monitoramento de Inatividade se já estiver autorizado
+    if (_authorized) {
+        // Se houver interação em qualquer botão, reseta o temporizador
+        if (inputs.isIncClicked() || inputs.isDecClicked() || inputs.isConfClicked() ||
+            inputs.isIncPressed() || inputs.isDecPressed() || inputs.isConfPressed()) {
+            _lastActivityTime = millis();
+        }
 
-    // 2. Está esperando a Vercel responder? Checa a fila assíncrona.
+        // Se passar de 15 segundos sem atividade, força o Logout automático
+        if (millis() - _lastActivityTime > 15000) {
+            Serial.println("[Auth] Sessao expirada por inatividade.");
+            logout();
+            return false;
+        }
+        return true;
+    }
+
+    // 2. Aguardando validação da nuvem
     if (_isValidating) {
         bool isAuth = false;
         String nome = "";
         
-        // Pergunta ao WiFiService se a resposta já chegou (não trava o loop)
         if (connectivity.readAuthResponse(isAuth, nome)) {
             processValidationResponse(isAuth, nome);
         }
-        return false; // Continua false até a resposta chegar e ser positiva
+        return false; 
     }
 
-    // 3. Lê o Hardware Físico
+    // 3. Varredura física de novas tags
     String uid = rfidReader.readTag();
-
-    // Se não passou cartão nenhum, sai instantaneamente.
     if (uid == "") return false;
 
-    // 4. Cartão passado! Joga na fila de rede e entra em estado de espera
-    Serial.println("[Auth] Tag detectada: " + uid + ". Validando na nuvem em background...");
-    
+    // 4. Dispara validação em background
+    Serial.println("[Auth] Tag detectada: " + uid + ". Validando na nuvem...");
     _isValidating = true;
     _pendingUID = uid;
-    
     connectivity.queueAuthRequest(uid); 
 
     return false;
 }
 
 void AuthService::processValidationResponse(bool isAuthorized, String userName) {
-    _isValidating = false; // Libera o leitor para novas tentativas
+    _isValidating = false; 
 
     if (isAuthorized) {
         _authorized = true;
         _activeUserID = _pendingUID;
         _activeUserName = userName;
+        _lastActivityTime = millis(); // Inicia contagem de inatividade
         Serial.printf("[Auth] Acesso Liberado. Bem-vindo: %s\n", _activeUserName.c_str());
     } else {
         Serial.println("[Auth] Acesso Negado pela nuvem.");
@@ -61,7 +77,8 @@ void AuthService::logout() {
     _isValidating = false;
     _activeUserID = "";
     _activeUserName = "";
-    Serial.println("[Auth] Sessão encerrada.");
+    _lastActivityTime = 0;
+    Serial.println("[Auth] Sessao encerrada.");
 }
 
 bool AuthService::isAuthorized() { return _authorized; }

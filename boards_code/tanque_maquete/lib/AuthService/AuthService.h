@@ -28,6 +28,7 @@ private:
     String _pendingUID; // Guarda o UID que está sendo validado no momento
     String _activeUserID;
     String _activeUserName;
+    unsigned long _lastActivityTime; // NOVO: Controle de inatividade
 };
 
 extern AuthService auth;

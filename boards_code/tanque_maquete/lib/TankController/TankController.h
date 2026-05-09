@@ -71,6 +71,13 @@ private:
     bool _isOperationPossible(TankJob job);
     void _updateStatusLED();
     void _checkMaintenanceConditions();
+
+    // NOVO: Processador de Comandos da Nuvem
+    void _processRemoteCommands();
+    
+    // NOVO: Telemetria Contínua
+    unsigned long _lastTelemetryTime = 0;
+    void _sendTelemetry();
 };
 
 extern TankController controller;
