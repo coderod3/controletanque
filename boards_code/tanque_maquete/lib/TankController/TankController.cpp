@@ -179,19 +179,33 @@ void TankController::_handleStateMachine() {
 void TankController::_processIdle() {
     static bool wasValidating = false;
 
-    // 1. Feedback visual contínuo enquanto espera a nuvem responder o RFID
+    // 1. Feedback visual enquanto espera a resposta da rede
     if (auth.isValidating()) {
         if (!wasValidating) {
             display.showStatus("VALIDANDO TAG", "Aguarde a rede...");
             wasValidating = true;
         }
-        auth.update(); // Continua checando a fila da nuvem
-        return; // Impede que o display pisque de volta para o volume
+        auth.update(); // Mantém processando a fila da nuvem
+        return; 
     } 
-    // 2. Apaga a mensagem de "Validando" assim que a resposta chegar
+    // 2. Acabou de receber a resposta da Vercel!
     else if (wasValidating) {
         wasValidating = false;
-        _needsUpdate = true; 
+        
+        if (auth.isAuthorized()) {
+            display.showStatus("ACESSO LIBERADO", auth.getActiveUserName());
+            delay(1500); // Mostra o nome do operador antes de pular pro menu
+            _menuLitros = 1; 
+            _menuEncher = true; 
+            _needsUpdate = true;
+            _currentState = STATE_LOCAL_CONFIG_DIR;
+        } else {
+            // MOSTRA O ERRO NA TELA (Ex: "Nao Cadastrada" ou "HTTP Error -1")
+            display.showStatus("ACESSO NEGADO", auth.getActiveUserName());
+            delay(3000); // Trava a tela por 3 segundos para você conseguir ler
+            _needsUpdate = true;
+        }
+        return;
     }
 
     // 3. Exibição padrão do tanque em repouso
@@ -200,15 +214,13 @@ void TankController::_processIdle() {
         _needsUpdate = false;
     }
     
-    // 4. Libera a ida para o menu se foi autorizado com sucesso
-    if (auth.update()) {
-        _menuLitros = 1; 
-        _menuEncher = true; 
-        _needsUpdate = true;
-        _currentState = STATE_LOCAL_CONFIG_DIR;
+    // 4. Inicia varredura física do cartão
+    auth.update();
+    if (auth.isValidating()) {
+        _needsUpdate = true; // Força a tela a mudar no próximo ciclo
     }
     
-    // Se houver tarefas na fila (Remotas ou Locais), inicia validação
+    // 5. Se houver tarefas remotas na fila, avança para execução
     if (!_jobQueue.empty()) {
         _currentState = STATE_VALIDATING;
     }

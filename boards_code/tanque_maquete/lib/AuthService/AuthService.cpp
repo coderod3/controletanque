@@ -59,15 +59,15 @@ bool AuthService::update() {
 
 void AuthService::processValidationResponse(bool isAuthorized, String userName) {
     _isValidating = false; 
+    
+    // Salva o nome do operador (se autorizado) ou o motivo do erro (se negado)
+    _activeUserName = userName;
 
     if (isAuthorized) {
         _authorized = true;
         _activeUserID = _pendingUID;
-        _activeUserName = userName;
-        _lastActivityTime = millis(); // Inicia contagem de inatividade
-        Serial.printf("[Auth] Acesso Liberado. Bem-vindo: %s\n", _activeUserName.c_str());
+        _lastActivityTime = millis();
     } else {
-        Serial.println("[Auth] Acesso Negado pela nuvem.");
         _pendingUID = "";
     }
 }

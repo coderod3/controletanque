@@ -7,6 +7,7 @@ export default async function handler(req, res) {
   }
 
   const { tag_id } = req.body;
+  console.log("TAG LIDa: ", tag_id); // <-- ADICIONE APENAS ESTA LINHA
   if (!tag_id) return res.status(400).json({ authorized: false, error: 'Tag ID ausente' });
 
   const client = await db.connect();

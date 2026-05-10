@@ -200,15 +200,16 @@ void WiFiService::_networkTask(void* pvParameters) {
                     case EVENT_HTTP_DIGITAL_TWIN:
                         cloud.syncDigitalTwin(pendingEvent.status, pendingEvent.level);
                         break;
-
-                    // Adicione este novo caso no switch (pendingEvent.type):
                     case EVENT_HTTP_AUTH_REQUEST: {
                         bool authorized = false;
-                        String nome = "";
+                        String msgTela = "Erro Desconhecido";
                         
-                        // Faz o HTTP POST pesado (Roda no Core 0, sem travar as bombas!)
+                        // CRÍTICO: Cliente HTTPS que ignora certificados restritos
+                        WiFiClientSecure secureClient;
+                        secureClient.setInsecure(); 
+
                         HTTPClient http;
-                        http.begin("https://controletanque.vercel.app/api/auth/auth");
+                        http.begin(secureClient, "https://controletanque.vercel.app/api/auth/auth");
                         http.addHeader("Content-Type", "application/json");
                         
                         JsonDocument doc; 
@@ -217,22 +218,27 @@ void WiFiService::_networkTask(void* pvParameters) {
                         serializeJson(doc, jsonBody);
 
                         int httpCode = http.POST(jsonBody);
+                        
                         if (httpCode == 200) {
                             String response = http.getString();
                             JsonDocument resDoc;
                             deserializeJson(resDoc, response);
                             authorized = true;
-                            nome = resDoc["nome"].as<String>();
+                            msgTela = resDoc["nome"].as<String>();
+                        } else if (httpCode == 401) {
+                            msgTela = "Nao Cadastrada";
+                        } else if (httpCode < 0) {
+                            msgTela = "Falha Wi-Fi/SSL";
                         } else {
-                            Serial.printf("[Auth] Falha na rede HTTP: %d\n", httpCode);
+                            msgTela = "HTTP Error " + String(httpCode);
                         }
                         http.end();
 
-                        // Empacota a resposta e joga de volta para o Core 1
+                        // Empacota a resposta e o erro para mostrar no Display
                         AuthResponseEvent authRes;
                         authRes.isAuthorized = authorized;
                         memset(authRes.userName, 0, sizeof(authRes.userName));
-                        strncpy(authRes.userName, nome.c_str(), sizeof(authRes.userName) - 1);
+                        strncpy(authRes.userName, msgTela.c_str(), sizeof(authRes.userName) - 1);
                         xQueueSend(authRxQueue, &authRes, 0);
                         break;
                     }
