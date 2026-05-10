@@ -14,7 +14,10 @@ public:
     
     // Registra a conclusão de uma tarefa no banco
     void sendAuditLog(String rfid, String acao, float volume, float anterior, float atual);
-
+    
+    // Nova função para bater na API da Vercel
+    bool authenticateTag(String rfid_uid, String& outName);
+    
 private:
     const String _baseUrl = "https://controletanque.vercel.app/pages/api"; // Centralize sua URL aqui
 };

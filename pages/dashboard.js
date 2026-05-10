@@ -102,23 +102,23 @@ export default function DashboardPage() {
     <div style={{ padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <h1>Painel de Controle e Gêmeo Digital</h1>
       
-      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1 }}>
+      {/* GRID DE STATUS RESPONSIVO */}
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: '1 1 250px' }}>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>CONEXÃO MQTT (TEMPO REAL)</p>
           <strong style={{ fontSize: '1.2rem' }}>{statusMqtt}</strong>
         </div>
-        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1 }}>
+        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: '1 1 250px' }}>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>STATUS DO HARDWARE (BANCO DE DADOS)</p>
           <strong style={{ fontSize: '1.2rem', color: isOcupado ? '#ef4444' : '#22c55e' }}>{statusTanqueDB}</strong>
         </div>
-        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1 }}>
+        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', flex: '1 1 250px' }}>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>OPERADOR LOCAL</p>
           <strong style={{ fontSize: '1.2rem', color: '#2563eb' }}>{operador}</strong>
         </div>
       </div>
       
-      <div style={{ display: 'flex', gap: '50px', marginTop: '30px', alignItems: 'flex-start' }}>
-        <WaterTank nivel={nivel} />
+      <div style={{ display: 'flex', gap: '40px', marginTop: '30px', alignItems: 'flex-start', flexWrap: 'wrap' }}>        <WaterTank nivel={nivel} />
         
         <div style={{ flex: 1 }}>
           {/* PAINEL DE CONTROLE DE TAREFAS */}
@@ -146,6 +146,43 @@ export default function DashboardPage() {
                 ESVAZIAR
               </button>
             </div>
+            
+            {/* BOTÕES DE EMERGÊNCIA E RESET */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button 
+                onClick={() => client.publish('tanque/comando', JSON.stringify({ comando: "PARAR" }))}
+                style={{ flex: 2, padding: '15px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                PARADA DE EMERGÊNCIA
+              </button>
+              <button 
+                onClick={() => client.publish('tanque/comando', JSON.stringify({ comando: "RESET" }))}
+                style={{ flex: 1, padding: '15px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                RESETAR FALHA
+              </button>
+            </div>
+          </div>
+
+          {/* PAINEL DE DIAGNÓSTICO E HARDWARE */}
+          <div style={{ backgroundColor: '#f1f5f9', padding: '20px', borderRadius: '12px', border: '1px solid #cbd5e1', marginBottom: '20px' }}>
+            <h3 style={{ marginTop: 0, color: '#334155' }}>Diagnóstico de Hardware (Bypass)</h3>
+            <p style={{ fontSize: '0.85rem', color: '#475569' }}>Testa as conexões físicas ignorando a máquina de estados (Pulso de 2s).</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                onClick={() => client.publish('tanque/comando', JSON.stringify({ comando: "TESTE_BOMBA", encher: true }))}
+                style={{ flex: 1, padding: '10px', backgroundColor: '#334155', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+              >
+                TESTE BOMBA 1 (ENCHER)
+              </button>
+              <button 
+                onClick={() => client.publish('tanque/comando', JSON.stringify({ comando: "TESTE_BOMBA", encher: false }))}
+                style={{ flex: 1, padding: '10px', backgroundColor: '#334155', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+              >
+                TESTE BOMBA 2 (ESVAZIAR)
+              </button>
+            </div>
+          </div>
             
             <button 
               onClick={() => client.publish('tanque/comando', JSON.stringify({ comando: "PARAR" }))}

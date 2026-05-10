@@ -42,4 +42,35 @@ void CloudSync::sendAuditLog(String rfid, String acao, float volume, float anter
     http.end();
 }
 
+bool CloudSync::authenticateTag(String rfid_uid, String& outName) {
+    if (WiFi.status() != WL_CONNECTED) return false;
+
+    HTTPClient http;
+    http.begin(_baseUrl + "/auth/auth"); // Bate na sua API
+    http.addHeader("Content-Type", "application/json");
+
+    JsonDocument doc;
+    doc["tag_id"] = rfid_uid;
+
+    String json;
+    serializeJson(doc, json);
+    
+    int httpCode = http.POST(json);
+    bool authorized = false;
+
+    if (httpCode == 200) {
+        String payload = http.getString();
+        JsonDocument resDoc;
+        deserializeJson(resDoc, payload);
+        
+        if (resDoc["authorized"] == true) {
+            authorized = true;
+            outName = resDoc["nome"].as<String>();
+        }
+    }
+    
+    http.end();
+    return authorized;
+}
+
 CloudSync cloud;

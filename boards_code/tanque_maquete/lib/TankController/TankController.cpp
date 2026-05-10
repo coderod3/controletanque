@@ -5,7 +5,6 @@
 #include "WiFiService.h"
 #include "AuthService.h"
 #include "InputManager.h"
-#include "CloudSync.h"
 #include "HardwareMap.h"
 
 // Instância global para ser usada no main
@@ -111,6 +110,19 @@ void TankController::_processRemoteCommands() {
                 connectivity.queueLog("ERRO_VALORES_CALIBRACAO_INVALIDOS", true);
             }
         }
+        // --- NOVO: BYPASS DE HARDWARE PARA TESTE CRU ---
+        else if (comando == "TESTE_BOMBA") {
+            bool encher = doc["encher"] | true;
+            Serial.println("[Hardware] Teste direto de bomba acionado.");
+            
+            // Bypass completo: Para tudo, injeta sinal HIGH por 2s e desliga.
+            _forceHardwareStop();
+            digitalWrite(encher ? PIN_BOMBA_ENCHER : PIN_BOMBA_ESVAZ, HIGH);
+            delay(2000); // 2 segundos cravados (seguro para o Watchdog do RTOS)
+            _forceHardwareStop();
+            
+            connectivity.queueLog("TESTE_FISICO_BOMBA_OK");
+        }
     }
 }
 
@@ -165,12 +177,30 @@ void TankController::_handleStateMachine() {
 }
 
 void TankController::_processIdle() {
+    static bool wasValidating = false;
+
+    // 1. Feedback visual contínuo enquanto espera a nuvem responder o RFID
+    if (auth.isValidating()) {
+        if (!wasValidating) {
+            display.showStatus("VALIDANDO TAG", "Aguarde a rede...");
+            wasValidating = true;
+        }
+        auth.update(); // Continua checando a fila da nuvem
+        return; // Impede que o display pisque de volta para o volume
+    } 
+    // 2. Apaga a mensagem de "Validando" assim que a resposta chegar
+    else if (wasValidating) {
+        wasValidating = false;
+        _needsUpdate = true; 
+    }
+
+    // 3. Exibição padrão do tanque em repouso
     if (_needsUpdate) {
         display.showIdle(tank.getVolume());
         _needsUpdate = false;
     }
     
-    // Verifica se houve autenticação RFID para iniciar config local
+    // 4. Libera a ida para o menu se foi autorizado com sucesso
     if (auth.update()) {
         _menuLitros = 1; 
         _menuEncher = true; 
@@ -253,8 +283,8 @@ void TankController::_processValidating() {
     _lastLevelChangeTime = millis();
     _needsUpdate = true;
     
-    // Gêmeo Digital: Avisa o banco ANTES de ligar a bomba
-    cloud.syncDigitalTwin("EXECUTANDO", tank.getVolume());
+    // CORRIGIDO: Envio assíncrono não-bloqueante para o Core 0
+    connectivity.queueDigitalTwin("EXECUTANDO", tank.getVolume());
     
     _currentState = STATE_EXECUTING;
 }
@@ -287,15 +317,15 @@ void TankController::_processExecuting() {
         float nivelFinal = tank.getVolume();
         _forceHardwareStop();
 
-        // REGISTRO DE AUDITORIA (HARDWARE -> CLOUD)
-        cloud.sendAuditLog(auth.getActiveUserID(), 
+        // CORRIGIDO: Registro de Auditoria Assíncrono via IPC Queue (Core 1 -> Core 0)
+        connectivity.queueAuditLog(auth.getActiveUserID(), 
                         job.encher ? "ABASTECER" : "DRENAR", 
                         job.volumeSolicitado, 
                         _levelAtPumpStart, 
                         nivelFinal);
 
-        // Atualização do Digital Twin para IDLE
-        cloud.syncDigitalTwin("IDLE", nivelFinal);
+        // CORRIGIDO: Atualização assíncrona do Digital Twin
+        connectivity.queueDigitalTwin("IDLE", nivelFinal);
 
         _jobQueue.pop();
         _needsUpdate = true;
@@ -308,7 +338,9 @@ void TankController::_processExecuting() {
             _needsUpdate = true;
             _currentState = STATE_ERROR;
             connectivity.queueLog("ERRO: BOMBA TRAVADA");
-            cloud.syncDigitalTwin("ERRO: BOMBA TRAVADA", tank.getVolume());
+            
+            // CORRIGIDO: Digital Twin assíncrono em caso de erro
+            connectivity.queueDigitalTwin("ERRO: BOMBA TRAVADA", tank.getVolume());
         } else {
             _lastLevelChangeTime = millis();
             _levelAtPumpStart = tank.getVolume();
@@ -328,8 +360,9 @@ void TankController::_processEmergency() {
     if (_needsUpdate) {
         _forceHardwareStop();
         display.showEmergency(); 
-        // Nota: O status LED é atualizado pelo método _updateStatusLED chamado no loop
-        cloud.syncDigitalTwin("EMERGENCIA", tank.getVolume());
+        
+        // CORRIGIDO: Digital Twin assíncrono em caso de emergência
+        connectivity.queueDigitalTwin("EMERGENCIA", tank.getVolume());
         _needsUpdate = false;
     }
 }

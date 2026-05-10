@@ -39,13 +39,13 @@ export default function LogsPage() {
         <table border="1" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
           <thead style={{ backgroundColor: '#f4f4f4' }}>
             <tr>
-              <th>Data/Hora</th>
-              <th>Operador</th>
-              <th>Evento</th>
-              <th>Nível Inicial</th>
-              <th>Nível Final</th>
-              <th>Variação Líquida</th>
-              <th>Status</th>
+                <th>Data/Hora</th>
+                <th>Operador</th>
+                <th>Evento</th>
+                <th>Nível Inicial</th>
+                <th>Nível Final</th>
+                <th>Variação Líquida</th>
+                <th>Status</th>
             </tr>
           </thead>
           <tbody>
