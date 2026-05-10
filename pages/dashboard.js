@@ -121,30 +121,30 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', gap: '40px', marginTop: '30px', alignItems: 'flex-start', flexWrap: 'wrap' }}>        <WaterTank nivel={nivel} />
         
         <div style={{ flex: 1 }}>
-          {/* PAINEL DE CONTROLE DE TAREFAS */}
-          <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-            <h3 style={{ marginTop: 0 }}>Operação de Volume</h3>
-            <label style={{ display: 'block', marginBottom: '10px' }}>Volume (Litros):</label>
-            <input 
-              type="number" value={volumeInput} onChange={(e) => setVolumeInput(e.target.value)}
-              disabled={isOcupado}
-              style={{ fontSize: '20px', padding: '10px', width: '100px', marginBottom: '20px', opacity: isOcupado ? 0.5 : 1 }}
-            />
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                onClick={() => enviarComando(volumeInput, true)} 
+            {/* PAINEL DE CONTROLE DE TAREFAS */}
+            <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <h3 style={{ marginTop: 0 }}>Operação de Volume</h3>
+              <label style={{ display: 'block', marginBottom: '10px' }}>Volume (Litros):</label>
+              <input 
+                type="number" value={volumeInput} onChange={(e) => setVolumeInput(e.target.value)}
                 disabled={isOcupado}
-                style={{ padding: '15px', backgroundColor: isOcupado ? '#94a3b8' : '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: isOcupado ? 'not-allowed' : 'pointer', flex: 1 }}
-              >
-                ENCHER
-              </button>
-              <button 
-                onClick={() => enviarComando(volumeInput, false)} 
-                disabled={isOcupado}
-                style={{ padding: '15px', backgroundColor: isOcupado ? '#94a3b8' : '#1e293b', color: 'white', border: 'none', borderRadius: '8px', cursor: isOcupado ? 'not-allowed' : 'pointer', flex: 1 }}
-              >
-                ESVAZIAR
-              </button>
+                style={{ fontSize: '20px', padding: '10px', width: '100px', marginBottom: '20px', opacity: isOcupado ? 0.5 : 1 }}
+              />
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={() => enviarComando(volumeInput, true)} 
+                  disabled={isOcupado}
+                  style={{ padding: '15px', backgroundColor: isOcupado ? '#94a3b8' : '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: isOcupado ? 'not-allowed' : 'pointer', flex: 1 }}
+                >
+                  ENCHER
+                </button>
+                <button 
+                  onClick={() => enviarComando(volumeInput, false)} 
+                  disabled={isOcupado}
+                  style={{ padding: '15px', backgroundColor: isOcupado ? '#94a3b8' : '#1e293b', color: 'white', border: 'none', borderRadius: '8px', cursor: isOcupado ? 'not-allowed' : 'pointer', flex: 1 }}
+                >
+                  ESVAZIAR
+                </button>
             </div>
             
             {/* BOTÕES DE EMERGÊNCIA E RESET */}
@@ -184,14 +184,6 @@ export default function DashboardPage() {
             </div>
           </div>
             
-            <button 
-              onClick={() => client.publish('tanque/comando', JSON.stringify({ comando: "PARAR" }))}
-              style={{ marginTop: '20px', width: '100%', padding: '15px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              PARADA DE EMERGÊNCIA (SOBRESCREVE TRAVA)
-            </button>
-          </div>
-
           {/* PAINEL DE ENGENHARIA / CALIBRAÇÃO */}
           <div style={{ backgroundColor: '#fffbeb', padding: '20px', borderRadius: '12px', border: '1px solid #fde68a' }}>
             <h3 style={{ marginTop: 0, color: '#b45309' }}>Ajuste de Calibração (Hardware Flash)</h3>
