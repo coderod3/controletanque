@@ -1,44 +1,54 @@
 #include "CloudSync.h"
-#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h> // <-- ADICIONE AQUI
+#include <ArduinoJson.h>
 
-CloudSync::CloudSync() {}
+CloudSync::CloudSync() : _baseUrl("https://controletanque.vercel.app/api") {}
 
 void CloudSync::syncDigitalTwin(String status, float nivel) {
     if (WiFi.status() != WL_CONNECTED) return;
 
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure(); // <-- IGNORA O CERTIFICADO SSL
+
     HTTPClient http;
-    // Corrigido para a URL sem hífen conforme seu deploy
-    http.begin(_baseUrl + "/telemetria/status"); 
+    http.begin(secureClient, _baseUrl + "/telemetria/status");
     http.addHeader("Content-Type", "application/json");
 
-    JsonDocument doc; // ArduinoJson V7
+    JsonDocument doc;
     doc["status"] = status;
     doc["nivel"] = nivel;
 
     String json;
     serializeJson(doc, json);
-    http.POST(json);
+    int code = http.POST(json);
+    
+    if (code != 200) Serial.printf("[Cloud] Erro Digital Twin: %d\n", code);
     http.end();
 }
 
-void CloudSync::sendAuditLog(String rfid, String acao, float volume, float anterior, float atual) {
+void CloudSync::sendAuditLog(String rfid_uid, String acao, float volume, float anterior, float atual) {
     if (WiFi.status() != WL_CONNECTED) return;
 
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure(); // <-- IGNORA O CERTIFICADO SSL
+
     HTTPClient http;
-    http.begin(_baseUrl + "/telemetria/auditoria");
+    http.begin(secureClient, _baseUrl + "/telemetria/auditoria");
     http.addHeader("Content-Type", "application/json");
 
-    JsonDocument doc; // ArduinoJson V7
-    doc["rfid_uid"] = rfid;
+    JsonDocument doc;
+    doc["rfid_uid"] = rfid_uid;
     doc["acao"] = acao;
     doc["volume"] = volume;
     doc["valor_anterior"] = anterior;
     doc["valor_atual"] = atual;
-    doc["status"] = "SUCESSO";
 
     String json;
     serializeJson(doc, json);
-    http.POST(json);
+    int code = http.POST(json);
+    
+    if (code != 200) Serial.printf("[Cloud] Erro de Auditoria: %d\n", code);
     http.end();
 }
 

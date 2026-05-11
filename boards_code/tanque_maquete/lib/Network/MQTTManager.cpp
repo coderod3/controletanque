@@ -1,4 +1,5 @@
 #include "MQTTManager.h"
+#include "WiFiService.h" // Necessário para a fila rxQueue e IncomingCommand
 #include <ArduinoJson.h>
 
 // Instâncias locais e privadas do Wi-Fi Seguro e do MQTT
@@ -17,15 +18,27 @@ bool MQTTManager::isConnected() {
 }
 
 void MQTTManager::handle() {
+    // Se caiu a conexão, tenta reconectar sem travar (sem while loop)
     if (!mqttClient.connected()) {
-        Serial.print("[MQTT] Tentando conexao com o Broker... ");
-        // Tenta conectar
-        if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS)) {
-            Serial.println("Conectado!");
-            mqttClient.subscribe(TOPIC_COMANDO); // Assina o tópico de comandos
+        Serial.print("[MQTT] Conectando ao Broker... ");
+        
+        // --- CONFIGURAÇÃO DE LAST WILL E TESTAMENT (LWT) ---
+        const char* lwtTopic = "tanque/telemetria";
+        const char* lwtMessage = "{\"status_operacional\": \"OFFLINE ❌\", \"operador\": \"Desconectado\"}";
+        
+        // Parametros: ID, User, Pass, Topico_LWT, QoS, Retain, Mensagem_LWT
+        if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS, lwtTopic, 0, true, lwtMessage)) {
+            Serial.println("OK! Conectado.");
+            mqttClient.subscribe("tanque/comando"); // Assina comandos do Dashboard
+            
+            // --- Publica ONLINE instantaneamente ao ligar ---
+            String payloadOnline = "{\"status_operacional\": \"ONLINE ✅\"}";
+            mqttClient.publish("tanque/telemetria", payloadOnline.c_str(), true);
         } else {
             Serial.print("Falha, rc=");
             Serial.println(mqttClient.state());
+            // A task do Core 0 cuida do delay, retornamos para não engarrafar
+            return; 
         }
     } else {
         // Mantém a escuta do broker ativa
@@ -38,18 +51,16 @@ void MQTTManager::publishTelemetria(float nivel, const char* operador) {
     
     JsonDocument doc;
     doc["nivel"] = nivel;
-    doc["operador"] = operador;
+    doc["status_operacional"] = operador; // Alinhado com a chave do Dashboard
     doc["timestamp"] = millis();
     
     char buffer[128];
     serializeJson(doc, buffer);
-    mqttClient.publish(TOPIC_TELEMETRIA, buffer);
+    mqttClient.publish("tanque/telemetria", buffer);
 }
 
 void MQTTManager::publishLog(const char* message, bool isError) {
     if (!mqttClient.connected()) return;
-    
-    // Se for erro, pode mandar para um tópico diferente no futuro, por enquanto vai no padrão
     mqttClient.publish("tanque/logs", message);
 }
 

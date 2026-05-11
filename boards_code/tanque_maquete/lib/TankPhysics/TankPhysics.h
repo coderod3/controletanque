@@ -32,19 +32,19 @@ public:
 
 private:
     Preferences _prefs;
+    // Variáveis de estado
     float _currentDistance;
-    float _readings[SENSOR_SAMPLES]; //
-    int _readIndex;
-    float _total;
-    float _average;
+    float _currentVolume;
+    unsigned long _lastReadTime;
+    
+    // Parâmetros de Calibração (Memória Flash)
+    float _maxVolume;
+    float _distVazio;
+    float _distCheio;
 
-    // Parâmetros de cálculo ativos (podem ser diferentes dos macros do Config.h)
-    float _activeMaxVolume;
-    float _activeDistVazio;
-    float _activeDistCheio;
-
-    float _measureDistance(); // Lógica interna do sensor
-    float _calculateVolume(float distance);
+    // Métodos internos dos filtros
+    float _getMedianDistance(); 
+    float _applyPhysicalLimits(float novaDistancia, float dt_segundos);
 };
 
 // Instância global

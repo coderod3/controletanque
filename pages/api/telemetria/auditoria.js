@@ -19,10 +19,13 @@ export default async function handler(req, res) {
     `;
     const tanque_id = tankRes.rows[0]?.id || null;
 
-    // 3. Insere a auditoria com todas as chaves estrangeiras resolvidas
+    // Define um status padrão de sucesso, já que o ESP32 só chama essa rota se a bomba terminou
+    const statusFinal = status || 'SUCESSO';
+
+    // 3. Insere a auditoria com todas as chaves estrangeiras resolvidas (Atenção ao origem_comando)
     await client.sql`
-      INSERT INTO historico (tanque_id, usuario_id, evento, origem, valor_recebido, valor_anterior, valor_atual, status)
-      VALUES (${tanque_id}, ${usuario_id}, ${acao}, 'HARDWARE', ${volume}, ${valor_anterior}, ${valor_atual}, ${status})
+      INSERT INTO historico (tanque_id, usuario_id, evento, origem_comando, valor_recebido, valor_anterior, valor_atual, status)
+      VALUES (${tanque_id}, ${usuario_id}, ${acao}, 'HARDWARE', ${volume}, ${valor_anterior}, ${valor_atual}, ${statusFinal})
     `;
 
     // 4. Atualiza o nível atual do tanque no Gêmeo Digital

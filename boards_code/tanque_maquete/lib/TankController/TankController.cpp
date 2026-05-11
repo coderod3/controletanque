@@ -421,11 +421,35 @@ void TankController::_updateStatusLED() {
 }
 
 void TankController::_sendTelemetry() {
-    // Dispara apenas a cada 1000 milissegundos (1 segundo)
-    if (millis() - _lastTelemetryTime >= 1000) {
-        _lastTelemetryTime = millis();
+    unsigned long agora = millis();
+    static float ultimoVolumeEnviado = -100.0;
+    static unsigned long ultimoEnvio = 0;
+    
+    bool deveEnviar = false;
+
+    // Em repouso: Verifica a cada 10s. Envia se variar mais de 0.5L
+    if (_currentState == STATE_IDLE) {
+        if (agora - ultimoEnvio > 10000) {
+            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.5) deveEnviar = true;
+            ultimoEnvio = agora; // Reseta o timer pra não avaliar toda hora
+        }
+    } 
+    // Em execução: Envia a cada 500ms se variar mais de 0.1L
+    else if (_currentState == STATE_EXECUTING) {
+        if (agora - ultimoEnvio > 500) {
+            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.1) deveEnviar = true;
+            ultimoEnvio = agora;
+        }
+    }
+    // Mudança de status: Se entrou em erro, emergência, ou comando de estado
+    else {
+        if (agora - ultimoEnvio > 2000) deveEnviar = true;
+    }
+
+    if (deveEnviar) {
+        ultimoVolumeEnviado = tank.getVolume();
+        ultimoEnvio = agora;
         
-        // Traduz o estado numérico para string
         String statusStr;
         switch(_currentState) {
             case STATE_IDLE: statusStr = "IDLE"; break;
@@ -435,7 +459,6 @@ void TankController::_sendTelemetry() {
             default: statusStr = "DESCONHECIDO"; break;
         }
 
-        // Envia para a Fila do MQTT (O Core 0 despacha para a nuvem em background)
-        connectivity.queueTelemetria(tank.getVolume(), statusStr);
+        connectivity.queueTelemetria(ultimoVolumeEnviado, statusStr);
     }
 }
