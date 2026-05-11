@@ -59,7 +59,6 @@ void TankController::update() {
 void TankController::_processRemoteCommands() {
     IncomingCommand cmd;
     
-    // Lê a fila de rede (retorna instantaneamente se estiver vazia)
     if (connectivity.readPendingCommand(cmd)) {
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, cmd.payload);
@@ -69,7 +68,7 @@ void TankController::_processRemoteCommands() {
             return;
         }
 
-        String comando = doc["comando"] | doc["command"] | ""; // Aceita as duas chaves
+        String comando = doc["comando"] | doc["command"] | ""; 
         comando.toUpperCase();
         
         Serial.println("[Controller] Comando remoto recebido: " + comando);
@@ -96,32 +95,40 @@ void TankController::_processRemoteCommands() {
                                (_currentState == STATE_ERROR) ? "ERRO" : "IDLE";
             connectivity.queueDigitalTwin(statusStr, tank.getVolume());
         }
-        // --- PASSO 2: CALIBRAÇÃO DINÂMICA VIA REDE ---
         else if (comando == "CALIBRAR") {
             float maxVol = doc["max_vol"];
             float distVazio = doc["dist_vazio"];
             float distCheio = doc["dist_cheio"];
             
-            // Validação de segurança antes de aplicar na memória Flash
             if (maxVol > 0 && distVazio > distCheio) {
-                tank.syncConfig(maxVol, distVazio, distCheio); // Grava na Flash e aplica
+                tank.syncConfig(maxVol, distVazio, distCheio); 
                 connectivity.queueLog("CALIBRACAO_ATUALIZADA");
             } else {
                 connectivity.queueLog("ERRO_VALORES_CALIBRACAO_INVALIDOS", true);
             }
         }
-        // --- NOVO: BYPASS DE HARDWARE PARA TESTE CRU ---
         else if (comando == "TESTE_BOMBA") {
             bool encher = doc["encher"] | true;
-            Serial.println("[Hardware] Teste direto de bomba acionado.");
-            
-            // Bypass completo: Para tudo, injeta sinal HIGH por 2s e desliga.
             _forceHardwareStop();
             digitalWrite(encher ? PIN_BOMBA_ENCHER : PIN_BOMBA_ESVAZ, HIGH);
-            delay(2000); // 2 segundos cravados (seguro para o Watchdog do RTOS)
+            delay(2000); 
             _forceHardwareStop();
-            
             connectivity.queueLog("TESTE_FISICO_BOMBA_OK");
+        }
+        // --- FASE 3: SINCRONIZAÇÃO DE USUÁRIOS ---
+        else if (comando == "SYNC_USER") {
+            String uid = doc["uid"].as<String>();
+            String nome = doc["nome"].as<String>();
+            bool ativo = doc["ativo"] | true;
+            
+            if (uid.length() > 0) {
+                auth.syncUser(uid, nome, ativo);
+                connectivity.queueLog("DB_USUARIO_SINCRONIZADO: " + nome);
+            }
+        }
+        else if (comando == "CLEAR_USERS") {
+            auth.clearUsers();
+            connectivity.queueLog("DB_USUARIOS_LIMPA");
         }
     }
 }
@@ -457,7 +464,7 @@ void TankController::_sendTelemetry() {
     // Em execução: Envia a cada 500ms se variar mais de 0.1L
     else if (_currentState == STATE_EXECUTING) {
         if (agora - ultimoEnvio > 500) {
-            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.1) deveEnviar = true;
+            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.5) deveEnviar = true;
             ultimoEnvio = agora;
         }
     }

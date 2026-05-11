@@ -18,8 +18,16 @@ public:
     // Nova função para bater na API da Vercel
     bool authenticateTag(String rfid_uid, String& outName);
     
+    // FASE 3: Edge Computing (Retenção de Logs)
+    void flushOfflineLogs();
+
 private:
     const String _baseUrl = "https://controletanque.vercel.app/pages/api"; // Centralize sua URL aqui
+
+    Preferences _prefs; // Objeto de acesso à NVS
+    
+    void saveLogOffline(String jsonPayload);
+    
 };
 
 extern CloudSync cloud; // Instância global para ser usada no main

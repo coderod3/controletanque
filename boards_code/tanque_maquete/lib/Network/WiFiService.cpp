@@ -137,48 +137,48 @@ void WiFiService::_networkTask(void* pvParameters) {
     } else {
         Serial.println("[WiFi] IP Estático definido para: 192.168.0.115");
     }
-    
     // -----------------------------------
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-    // Inicializa as configurações base do MQTT (ainda não conecta, só configura)
     MQTTManager::init();
 
     bool otaSetupDone = false;
+    static bool wasConnected = false; // FASE 3: Detetor de transição de rede
     NetworkEvent pendingEvent;
 
     for (;;) {
         // --- 1. Manutenção de Conexão (Wi-Fi, OTA e MQTT) ---
         if (WiFi.status() == WL_CONNECTED) {
-            if (!instance->_connected) {
+            
+            // FASE 3: ACABOU DE CONECTAR! DISPARA O FLUSH DOS LOGS OFFLINE
+            if (!wasConnected) {
+                wasConnected = true;
                 instance->_connected = true;
                 
                 Serial.println("\n====================================");
                 Serial.println("[WiFi] CONECTADO COM SUCESSO!");
                 Serial.print("[WiFi] IP ATUAL: ");
                 Serial.println(WiFi.localIP());
-                Serial.print("[WiFi] MAC ADDRESS: ");
-                Serial.println(WiFi.macAddress());
                 Serial.println("====================================\n");
                 
                 if (!otaSetupDone) {
                     OTAManager::init("nexus-tank-esp32");
                     otaSetupDone = true;
                 }
+
+                // Descarrega os logs que a placa guardou enquanto estava sem rede
+                // Faz isso antes de aceitar comandos novos
+                cloud.flushOfflineLogs();
             }
 
-            // Escuta passiva para atualizações sem fio
-            if (otaSetupDone) {
-                OTAManager::handle();
-            }
-
-            // O MQTTManager resolve sozinho se precisa conectar ou só fazer loop da escuta
+            if (otaSetupDone) OTAManager::handle();
             MQTTManager::handle();
 
         } else {
+            // A rede caiu.
+            wasConnected = false;
             instance->_connected = false;
-            // Reconexão silenciosa a cada ~10 segundos se cair, sem bloquear nada
+            
             static unsigned long lastReconnect = 0;
             if (millis() - lastReconnect > 10000) {
                 lastReconnect = millis();
@@ -187,12 +187,19 @@ void WiFiService::_networkTask(void* pvParameters) {
         }
 
         // --- 2. Processamento da Fila de Transmissão (Despacho) ---
-        // Aguarda até 5ms por um pacote
         if (xQueueReceive(txQueue, &pendingEvent, pdMS_TO_TICKS(5)) == pdPASS) {
             
-            if (WiFi.status() == WL_CONNECTED) {
+            // ATENÇÃO: Auditoria agora é chamada MESMO SE OFFLINE! 
+            // O próprio `sendAuditLog` do CloudSync vai decidir se guarda fisicamente ou envia.
+            if (pendingEvent.type == EVENT_HTTP_AUDITORIA) {
+                cloud.sendAuditLog(pendingEvent.rfid_uid, pendingEvent.acao, 
+                                   pendingEvent.level, pendingEvent.valor_anterior, 
+                                   pendingEvent.valor_atual);
+            }
+            
+            // As restantes operações dependem de rede ao vivo
+            else if (WiFi.status() == WL_CONNECTED) {
                 switch (pendingEvent.type) {
-                    
                     case EVENT_MQTT_TELEMETRIA:
                         MQTTManager::publishTelemetria(pendingEvent.level, pendingEvent.status);
                         break;
@@ -200,54 +207,19 @@ void WiFiService::_networkTask(void* pvParameters) {
                     case EVENT_HTTP_DIGITAL_TWIN:
                         cloud.syncDigitalTwin(pendingEvent.status, pendingEvent.level);
                         break;
+
                     case EVENT_HTTP_AUTH_REQUEST: {
-                        bool authorized = false;
-                        String msgTela = "Erro Desconhecido";
+                        // Delega a consulta à nuvem para o CloudSync, deixando o código do Wi-Fi limpo
+                        String nome;
+                        bool isAuth = cloud.authenticateTag(pendingEvent.rfid_uid, nome);
                         
-                        // CRÍTICO: Cliente HTTPS que ignora certificados restritos
-                        WiFiClientSecure secureClient;
-                        secureClient.setInsecure(); 
-
-                        HTTPClient http;
-                        http.begin(secureClient, "https://controletanque.vercel.app/api/auth/auth");
-                        http.addHeader("Content-Type", "application/json");
-                        
-                        JsonDocument doc; 
-                        doc["tag_id"] = pendingEvent.rfid_uid;
-                        String jsonBody;
-                        serializeJson(doc, jsonBody);
-
-                        int httpCode = http.POST(jsonBody);
-                        
-                        if (httpCode == 200) {
-                            String response = http.getString();
-                            JsonDocument resDoc;
-                            deserializeJson(resDoc, response);
-                            authorized = true;
-                            msgTela = resDoc["nome"].as<String>();
-                        } else if (httpCode == 401) {
-                            msgTela = "Nao Cadastrada";
-                        } else if (httpCode < 0) {
-                            msgTela = "Falha Wi-Fi/SSL";
-                        } else {
-                            msgTela = "HTTP Error " + String(httpCode);
-                        }
-                        http.end();
-
-                        // Empacota a resposta e o erro para mostrar no Display
                         AuthResponseEvent authRes;
-                        authRes.isAuthorized = authorized;
+                        authRes.isAuthorized = isAuth;
                         memset(authRes.userName, 0, sizeof(authRes.userName));
-                        strncpy(authRes.userName, msgTela.c_str(), sizeof(authRes.userName) - 1);
+                        strncpy(authRes.userName, nome.c_str(), sizeof(authRes.userName) - 1);
                         xQueueSend(authRxQueue, &authRes, 0);
                         break;
                     }
-
-                    case EVENT_HTTP_AUDITORIA:
-                        cloud.sendAuditLog(pendingEvent.rfid_uid, pendingEvent.acao, 
-                                           pendingEvent.level, pendingEvent.valor_anterior, 
-                                           pendingEvent.valor_atual);
-                        break;
 
                     case EVENT_MQTT_LOG_INFO:
                         MQTTManager::publishLog(pendingEvent.log_message, false);
