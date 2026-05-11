@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     const statusFinal = status || 'SUCESSO';
 
-    // Gravação respeitando o NOT NULL da coluna "origem"
+    // Gravação segura: apenas Histórico. Não atualiza o Tanque para não causar dessincronia no modo Offline.
     await client.sql`
       INSERT INTO historico (
         tanque_id, usuario_id, evento, origem, origem_comando, 
@@ -25,12 +25,6 @@ export default async function handler(req, res) {
         ${tanque_id}, ${usuario_id}, ${acao}, 'HARDWARE', 'ESP32_FÍSICO', 
         ${volume}, ${valor_anterior}, ${valor_atual}, ${statusFinal}
       )
-    `;
-
-    // Atualiza o nível no Gêmeo Digital
-    await client.sql`
-      UPDATE tanques SET nivel_atual = ${valor_atual}, ultima_sincronizacao = NOW()
-      WHERE nome = 'Tanque Principal'
     `;
 
     return res.status(200).json({ success: true });

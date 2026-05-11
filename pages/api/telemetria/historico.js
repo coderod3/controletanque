@@ -6,11 +6,11 @@ export default async function handler(req, res) {
   const client = await db.connect();
 
   try {
-    // Busca exata respeitando o schema fornecido
     const { rows } = await client.sql`
       SELECT 
         h.id,
         h.hora_request_recebido_servidor AS data, 
+        COALESCE(t.nome, 'Desconhecido') AS tanque,
         COALESCE(u.nome, 'Sistema / Hardware') AS operador, 
         h.evento, 
         h.origem,
@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       FROM historico h
       LEFT JOIN usuarios u ON h.usuario_id = u.id
       LEFT JOIN usuarios g ON h.gestor_autorizador_id = g.id
+      LEFT JOIN tanques t ON h.tanque_id = t.id
       ORDER BY h.hora_request_recebido_servidor DESC 
       LIMIT 100
     `;

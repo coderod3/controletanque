@@ -464,7 +464,7 @@ void TankController::_sendTelemetry() {
     // Em execução: Envia a cada 500ms se variar mais de 0.1L
     else if (_currentState == STATE_EXECUTING) {
         if (agora - ultimoEnvio > 500) {
-            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.5) deveEnviar = true;
+            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.1) deveEnviar = true;
             ultimoEnvio = agora;
         }
     }
