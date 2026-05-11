@@ -129,16 +129,22 @@ void TankController::_processRemoteCommands() {
 void TankController::addJob(float vol, bool encher, String origem) {
     TankJob newJob = { vol, encher, origem };
     
-    // Valida se a operação é fisicamente possível baseado na calibração atual
     if (_isOperationPossible(newJob)) {
         _jobQueue.push(newJob);
-        
         // Atualiza o volume virtual (Soma o que já está na fila + o novo)
         _virtualVolume += (encher ? vol : -vol);
         
         connectivity.queueLog(origem + "_ACEITO: " + String(vol) + "L");
     } else {
-        connectivity.queueLog(origem + "_NEGADO: LIMITE_EXCEDIDO");
+        // FASE 2: Feedback Ativo de Rejeição
+        // 1. Informa o Dashboard remotamente via MQTT
+        connectivity.queueLog("NEGADO: LIMITE EXCEDIDO", true);
+        
+        // 2. Informa o operador fisicamente no LCD
+        _forceHardwareStop();
+        display.showStatus("OPERACAO NEGADA", "Limite Excedido");
+        delay(2000); // Bloqueio visual de 2s aceitável aqui (a bomba está parada)
+        _needsUpdate = true;
     }
 }
 
@@ -178,52 +184,66 @@ void TankController::_handleStateMachine() {
 
 void TankController::_processIdle() {
     static bool wasValidating = false;
+    static unsigned long lastOfflineToggle = 0;
+    static bool isShowingOffline = false;
 
-    // 1. Feedback visual enquanto espera a resposta da rede
+    // 1. Feedback visual contínuo enquanto espera a nuvem responder o RFID
     if (auth.isValidating()) {
         if (!wasValidating) {
             display.showStatus("VALIDANDO TAG", "Aguarde a rede...");
             wasValidating = true;
         }
-        auth.update(); // Mantém processando a fila da nuvem
+        auth.update(); 
         return; 
     } 
-    // 2. Acabou de receber a resposta da Vercel!
+    // 2. Acabou de receber a resposta da Vercel
     else if (wasValidating) {
         wasValidating = false;
         
         if (auth.isAuthorized()) {
             display.showStatus("ACESSO LIBERADO", auth.getActiveUserName());
-            delay(1500); // Mostra o nome do operador antes de pular pro menu
+            delay(1500); 
             _menuLitros = 1; 
             _menuEncher = true; 
             _needsUpdate = true;
             _currentState = STATE_LOCAL_CONFIG_DIR;
         } else {
-            // MOSTRA O ERRO NA TELA (Ex: "Nao Cadastrada" ou "HTTP Error -1")
-            display.showStatus("ACESSO NEGADO", auth.getActiveUserName());
-            delay(3000); // Trava a tela por 3 segundos para você conseguir ler
+            display.showStatus("UID: " + auth.getActiveUserID(), auth.getActiveUserName());
+            delay(4000); 
+            auth.logout(); 
             _needsUpdate = true;
         }
         return;
     }
 
-    // 3. Exibição padrão do tanque em repouso
-    if (_needsUpdate) {
+    // 3. FASE 2: Consciência de Queda de Rede (Offline Warning no LCD)
+    if (!connectivity.isConnected()) {
+        if (millis() - lastOfflineToggle > 2000) {
+            isShowingOffline = !isShowingOffline;
+            // Alterna a cada 2s entre o aviso e o nível de água
+            if (isShowingOffline) display.showStatus("SISTEMA OFFLINE", "Sem Nuvem");
+            else display.showIdle(tank.getVolume());
+            lastOfflineToggle = millis();
+        }
+    } else {
+        if (isShowingOffline) { // O Wi-Fi acabou de voltar
+            isShowingOffline = false;
+            _needsUpdate = true;
+        }
+    }
+
+    // 4. Exibição padrão do tanque em repouso
+    if (_needsUpdate && !isShowingOffline) {
         display.showIdle(tank.getVolume());
         _needsUpdate = false;
     }
     
-    // 4. Inicia varredura física do cartão
+    // 5. Inicia varredura física do cartão
     auth.update();
-    if (auth.isValidating()) {
-        _needsUpdate = true; // Força a tela a mudar no próximo ciclo
-    }
+    if (auth.isValidating()) _needsUpdate = true; 
     
-    // 5. Se houver tarefas remotas na fila, avança para execução
-    if (!_jobQueue.empty()) {
-        _currentState = STATE_VALIDATING;
-    }
+    // 6. Avança para execução se a fila tiver tarefas
+    if (!_jobQueue.empty()) _currentState = STATE_VALIDATING;
 }
 
 void TankController::_processMaintenance() {
