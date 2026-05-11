@@ -18,10 +18,13 @@ export default function DashboardPage() {
       const res = await fetch('/api/tanque/status');
       if (res.ok) {
         const data = await res.json();
-        // Preserva o status visual de "OFFLINE" se o LWT do MQTT assim disser
-        if (placaOnline || statusTanqueDB === 'CARREGANDO...') {
-          setStatusTanqueDB(data.status_operacional);
-        }
+        
+        // Bloqueio de Closure: Só atualiza o status do banco se a placa não estiver dada como morta (LWT)
+        setStatusTanqueDB(prevStatus => {
+          if (prevStatus.includes('OFFLINE')) return prevStatus;
+          return data.status_operacional;
+        });
+        
         setConfigDB({ max: data.volume_maximo, vazio: data.distancia_vazio, cheio: data.distancia_cheio });
       }
     } catch (e) {

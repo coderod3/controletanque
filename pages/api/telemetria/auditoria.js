@@ -7,28 +7,27 @@ export default async function handler(req, res) {
   const client = await db.connect();
 
   try {
-    // 1. Busca o ID do usuário pelo RFID
-    const userRes = await client.sql`
-      SELECT id FROM usuarios WHERE rfid_uid = ${rfid_uid} LIMIT 1
-    `;
+    const userRes = await client.sql`SELECT id FROM usuarios WHERE rfid_uid = ${rfid_uid} LIMIT 1`;
     const usuario_id = userRes.rows[0]?.id || null;
 
-    // 2. Busca o ID do tanque principal
-    const tankRes = await client.sql`
-      SELECT id FROM tanques WHERE nome = 'Tanque Principal' LIMIT 1
-    `;
+    const tankRes = await client.sql`SELECT id FROM tanques WHERE nome = 'Tanque Principal' LIMIT 1`;
     const tanque_id = tankRes.rows[0]?.id || null;
 
-    // Define um status padrão de sucesso, já que o ESP32 só chama essa rota se a bomba terminou
     const statusFinal = status || 'SUCESSO';
 
-    // 3. Insere a auditoria com todas as chaves estrangeiras resolvidas (Atenção ao origem_comando)
+    // Gravação respeitando o NOT NULL da coluna "origem"
     await client.sql`
-      INSERT INTO historico (tanque_id, usuario_id, evento, origem_comando, valor_recebido, valor_anterior, valor_atual, status)
-      VALUES (${tanque_id}, ${usuario_id}, ${acao}, 'HARDWARE', ${volume}, ${valor_anterior}, ${valor_atual}, ${statusFinal})
+      INSERT INTO historico (
+        tanque_id, usuario_id, evento, origem, origem_comando, 
+        valor_recebido, valor_anterior, valor_atual, status
+      )
+      VALUES (
+        ${tanque_id}, ${usuario_id}, ${acao}, 'HARDWARE', 'ESP32_FÍSICO', 
+        ${volume}, ${valor_anterior}, ${valor_atual}, ${statusFinal}
+      )
     `;
 
-    // 4. Atualiza o nível atual do tanque no Gêmeo Digital
+    // Atualiza o nível no Gêmeo Digital
     await client.sql`
       UPDATE tanques SET nivel_atual = ${valor_atual}, ultima_sincronizacao = NOW()
       WHERE nome = 'Tanque Principal'
@@ -36,7 +35,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ success: true });
   } catch (error) {
-    console.error(error);
+    console.error("Erro no POST de auditoria:", error);
     return res.status(500).json({ error: error.message });
   } finally {
     client.release();
