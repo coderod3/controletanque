@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Preferences.h> // <-- AQUI ESTÁ A CORREÇÃO: Necessário para a NVS
 
 class CloudSync {
 public:
@@ -27,7 +28,7 @@ private:
     Preferences _prefs; // Objeto de acesso à NVS
     
     void saveLogOffline(String jsonPayload);
-    
+
 };
 
 extern CloudSync cloud; // Instância global para ser usada no main

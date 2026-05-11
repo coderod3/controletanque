@@ -112,6 +112,43 @@ export default function DashboardPage() {
     }
   };
 
+  const dispararSyncUsuarios = async () => {
+    if (!placaOnline) return alert("Ação bloqueada: A placa está offline. Ligue a máquina primeiro.");
+    if (!client?.connected) return alert("Dashboard desconectado do MQTT.");
+
+    try {
+      setStatusTanqueDB("SINCRONIZANDO...");
+      const res = await fetch('/api/usuarios');
+      
+      if (res.ok) {
+        const users = await res.json();
+        
+        // 1. Limpa a memória da placa para evitar lixo de usuários antigos
+        client.publish('tanque/comando', JSON.stringify({ comando: "CLEAR_USERS" }));
+        
+        // 2. Pequeno delay para a placa processar a limpeza, depois envia um por um
+        setTimeout(() => {
+          users.forEach(user => {
+            client.publish('tanque/comando', JSON.stringify({
+              comando: "SYNC_USER", 
+              uid: user.rfid_uid, 
+              nome: user.nome, 
+              ativo: true 
+            }));
+          });
+          alert(`Sucesso! ${users.length} usuários foram transferidos para a memória Edge da placa.`);
+          fetchDigitalTwin(); // Restaura o status visual
+        }, 500);
+
+      } else {
+        alert("Erro ao ler banco de dados.");
+      }
+    } catch (e) {
+      console.error("Erro no Sync:", e);
+      alert("Falha na sincronização.");
+    }
+  };
+
   // Trava botões e altera opacidade se a placa estiver operando ou morta (Offline)
   const isOcupado = statusTanqueDB !== 'IDLE' || !placaOnline;
 
@@ -227,6 +264,22 @@ export default function DashboardPage() {
               SINCRONIZAR CALIBRAÇÃO
             </button>
           </div>
+
+          <div style={{ backgroundColor: '#f0fdf4', padding: '20px', borderRadius: '12px', border: '1px solid #bbf7d0', marginTop: '20px' }}>
+            <h3 style={{ marginTop: 0, color: '#166534' }}>Edge Computing (Autenticação Offline)</h3>
+            <p style={{ fontSize: '0.85rem', color: '#15803d' }}>
+              Transfere os cartões RFID do banco de dados para a memória interna da placa. 
+              Isso permite que os operadores liguem a bomba mesmo se o Wi-Fi da fábrica cair.
+            </p>
+            <button 
+              onClick={dispararSyncUsuarios} 
+              disabled={!placaOnline}
+              style={{ width: '100%', padding: '12px', backgroundColor: !placaOnline ? '#86efac' : '#16a34a', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: !placaOnline ? 'not-allowed' : 'pointer' }}
+            >
+              ENVIAR USUÁRIOS PARA A PLACA
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
