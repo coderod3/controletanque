@@ -148,9 +148,10 @@ void WiFiService::_networkTask(void* pvParameters) {
 
     for (;;) {
         // --- 1. Manutenção de Conexão (Wi-Fi, OTA e MQTT) ---
+        static unsigned long lastFlush = 0; // Temporizador da Fila
+
         if (WiFi.status() == WL_CONNECTED) {
             
-            // FASE 3: ACABOU DE CONECTAR! DISPARA O FLUSH DOS LOGS OFFLINE
             if (!wasConnected) {
                 wasConnected = true;
                 instance->_connected = true;
@@ -165,10 +166,15 @@ void WiFiService::_networkTask(void* pvParameters) {
                     OTAManager::init("nexus-tank-esp32");
                     otaSetupDone = true;
                 }
+            }
 
-                // Descarrega os logs que a placa guardou enquanto estava sem rede
-                // Faz isso antes de aceitar comandos novos
-                cloud.flushOfflineLogs();
+            // NOVO: Despeja UM log offline a cada 1 segundo (Não bloqueia o Core 0)
+            if (millis() - lastFlush > 1000) {
+                if (cloud.flushNextOfflineLog()) {
+                    lastFlush = millis(); // Tem mais logs na fila, tenta o próximo em 1s
+                } else {
+                    lastFlush = millis() + 5000; // Fila vazia ou erro: espera 5s
+                }
             }
 
             if (otaSetupDone) OTAManager::handle();

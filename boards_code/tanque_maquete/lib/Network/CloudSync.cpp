@@ -79,64 +79,53 @@ void CloudSync::saveLogOffline(String jsonPayload) {
     _prefs.end();
 }
 
-// FASE 3: Despejo Automático ao Reconectar
-void CloudSync::flushOfflineLogs() {
-    if (WiFi.status() != WL_CONNECTED) return;
+// FASE 3: Despejo Automático Assíncrono (Pega o Índice 0 e recua a fila)
+bool CloudSync::flushNextOfflineLog() {
+    if (WiFi.status() != WL_CONNECTED) return false;
 
     _prefs.begin("offline_logs", false);
     int count = _prefs.getInt("count", 0);
+    
     if (count == 0) {
         _prefs.end();
-        return; // Nada a sincronizar
+        return false; // Fila vazia
     }
 
-    Serial.println("[Cloud] Sincronizando " + String(count) + " logs retidos...");
+    // Lê sempre o mais antigo (índice 0)
+    String json = _prefs.getString("log_0", "");
+    if (json == "") {
+        _prefs.end();
+        return false; 
+    }
 
     WiFiClientSecure secureClient;
     secureClient.setInsecure();
     HTTPClient http;
+    http.begin(secureClient, _baseUrl + "/telemetria/auditoria");
+    http.addHeader("Content-Type", "application/json");
     
-    int enviados = 0;
-    
-    for (int i = 0; i < count; i++) {
-        String key = "log_" + String(i);
-        String json = _prefs.getString(key.c_str(), "");
-        
-        if (json != "") {
-            http.begin(secureClient, _baseUrl + "/telemetria/auditoria");
-            http.addHeader("Content-Type", "application/json");
-            int code = http.POST(json);
-            http.end();
-            
-            if (code == 200) {
-                enviados++;
-            } else {
-                Serial.printf("[Cloud] Servidor recusou log %d. Pausando flush.\n", i);
-                break; // Para imediatamente para não perder logs. Tenta o resto depois.
-            }
-        }
-    }
+    int code = http.POST(json);
+    http.end();
 
-    // Reorganiza a fila fisicamente para apagar o que já foi enviado
-    if (enviados == count) {
-        _prefs.clear(); // Tudo enviado!
-        Serial.println("[Cloud] 100% dos logs offline foram sincronizados.");
-    } else if (enviados > 0) {
-        int restantes = count - enviados;
-        for (int i = 0; i < restantes; i++) {
-            String oldKey = "log_" + String(i + enviados);
-            String newKey = "log_" + String(i);
+    if (code == 200) {
+        // Sucesso: Apaga o enviado e empurra a fila inteira para frente
+        for (int i = 1; i < count; i++) {
+            String oldKey = "log_" + String(i);
+            String newKey = "log_" + String(i - 1);
             _prefs.putString(newKey.c_str(), _prefs.getString(oldKey.c_str(), ""));
         }
-        // Limpa o lixo que sobrou no final
-        for (int i = restantes; i < count; i++) {
-            _prefs.remove(("log_" + String(i)).c_str());
-        }
-        _prefs.putInt("count", restantes);
-        Serial.println("[Cloud] Parcial: " + String(enviados) + " enviados. Restam " + String(restantes));
+        // Apaga o último índice que ficou duplicado no final
+        _prefs.remove(("log_" + String(count - 1)).c_str());
+        _prefs.putInt("count", count - 1);
+        
+        Serial.printf("[Cloud] Log offline entregue. Restam: %d\n", count - 1);
+        _prefs.end();
+        return true; // True = "Tenho mais trabalho, chame-me de novo"
+    } else {
+        Serial.printf("[Cloud] Erro no Server (HTTP %d). Pausando fila...\n", code);
+        _prefs.end();
+        return false; // False = "Erro, pare de chamar por agora"
     }
-
-    _prefs.end();
 }
 
 bool CloudSync::authenticateTag(String rfid_uid, String& outName) {

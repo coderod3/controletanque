@@ -20,8 +20,8 @@ public:
     bool authenticateTag(String rfid_uid, String& outName);
     
     // FASE 3: Edge Computing (Retenção de Logs)
-    void flushOfflineLogs();
-
+    bool flushNextOfflineLog();
+    
 private:
     const String _baseUrl = "https://controletanque.vercel.app/pages/api"; // Centralize sua URL aqui
 
