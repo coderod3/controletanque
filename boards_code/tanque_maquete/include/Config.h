@@ -18,20 +18,33 @@
 #define TANK_HEIGHT_FULL  2.0   // 2cm lidos = Cheio
 #define TANK_MAX_DIST     20.0  // Acima disso = Erro/Manutenção
 #define TANK_MAX_VOLUME   100.0 // Nova escala alvo: 100L
-#define TANK_BASE_AREA    6.25  // Área calculada para 2L em 16cm de delta
 #define TANK_SAFE_MARGIN  0.5
 */
-
 
 // =============================================================================
 // PARÂMETROS DO TANQUE (Escala 1:1 para Emulador)
 // =============================================================================
-#define TANK_HEIGHT_EMPTY 100.0 // 100cm de distância = 0 Litros
-#define TANK_HEIGHT_FULL  0.0   // 0cm de distância = 100 Litros
-#define TANK_MAX_DIST     105.0 // Margem para erro de leitura no emulador
+#define TANK_HEIGHT_EMPTY 18.0 // 100cm de distância = 0 Litros
+#define TANK_HEIGHT_FULL  2.0   // 0cm de distância = 100 Litros
+#define TANK_MAX_DIST     20.0 // Margem para erro de leitura no emulador
 #define TANK_MAX_VOLUME   100.0 // Volume máximo para travas de software
-#define TANK_BASE_AREA    1.0   // 1cm de variação = 1 Litro
-#define TANK_SAFE_MARGIN  0.0
+#define TANK_SAFE_MARGIN  0.5
+
+// --- CONFIGURAÇÕES DO SENSOR ULTRASSÔNICO ---
+#define SENSOR_SAMPLES 8                  // Quantidade de leituras para extrair a mediana
+#define SENSOR_ECHO_DELAY_MS 40           // Tempo para o eco dissipar (evita o sensor "pular")
+#define SENSOR_MAX_SLEW_RATE_CM_S 6.0f     // Salto máximo permitido por segundo (ignora erros brutais)
+#define SENSOR_READ_INTERVAL       120     // ms entre leituras completas
+
+// =============================================================================
+// PARÂMETROS DE TELEMETRIA E SEGURANÇA FÍSICA
+// =============================================================================
+#define TELEMETRY_IDLE_DELTA_L       1.5    // Variação em % (ou L) exigida para envio em repouso
+#define TELEMETRY_IDLE_INTERVAL_MS   10000  // Frequência de avaliação em repouso (10s)
+#define TELEMETRY_EXEC_DELTA_L       0.8    // Variação em % (ou L) exigida para envio com bomba ligada
+#define TELEMETRY_EXEC_INTERVAL_MS   400    // Frequência de avaliação com bomba ligada (0.5s)
+// #define PUMP_STALL_DELTA_L           0.05   // Variação mínima esperada antes de declarar "FALHA BOMBA"
+
 
 // =============================================================================
 // CONFIGURAÇÕES DE REDE (Onde estavam os erros)

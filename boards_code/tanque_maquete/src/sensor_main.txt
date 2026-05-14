@@ -1,0 +1,71 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include "Config.h"         // Importa WIFI_SSID e WIFI_PASSWORD
+#include "HardwareMap.h"    // Importa PIN_TRIGGER e PIN_ECHO
+#include "DisplayManager.h" // Controle do Ecrã
+#include "OTAManager.h"     // Serviço de Atualização sem fio
+
+unsigned long ultimoTeste = 0;
+
+void setup() {
+    Serial.begin(115200);
+    display.init();
+
+    // 1. Conecta ao Wi-Fi (Necessário para o OTA funcionar)
+    display.showStatus("TESTE SENSOR", "Conectando WiFi...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\n[Wi-Fi] Conectado!");
+
+    // 2. Inicia o serviço OTA (Mesmo nome que usamos no projeto)
+    OTAManager::init("nexus-tank-esp32");
+    display.showStatus("WIFI & OTA OK", "Pode enviar codigo!");
+    delay(2000);
+
+    // 3. Configura os pinos do Sensor Ultrassônico
+    pinMode(PIN_TRIGGER, OUTPUT);
+    pinMode(PIN_ECHO, INPUT);
+    digitalWrite(PIN_TRIGGER, LOW);
+}
+
+void loop() {
+    // ESSENCIAL: Mantém a placa escutando novas atualizações via Wi-Fi o tempo todo
+    OTAManager::handle();
+
+    // Faz a medição a cada 500ms, mas sem usar "delay()" para não travar o OTA
+    if (millis() - ultimoTeste > 500) {
+        ultimoTeste = millis();
+
+        // Disparo do som
+        digitalWrite(PIN_TRIGGER, LOW);
+        delayMicroseconds(2);
+        digitalWrite(PIN_TRIGGER, HIGH);
+        delayMicroseconds(10);
+        digitalWrite(PIN_TRIGGER, LOW);
+
+        // Captura do eco (Timeout de 30ms)
+        long duracao = pulseIn(PIN_ECHO, HIGH, 30000);
+        float distancia_cm = 0.0;
+        
+        if (duracao > 0) {
+            distancia_cm = (duracao * 0.0343) / 2.0;
+        }
+
+        // Print no Terminal
+        Serial.print("Leitura: ");
+        Serial.print(distancia_cm);
+        Serial.println(" cm");
+
+        // Print no Display OLED/LCD
+        if (duracao == 0) {
+            display.showStatus("SENSOR:", "0.0 cm (Falha)");
+        } else {
+            display.showStatus("SENSOR:", String(distancia_cm, 1) + " cm");
+        }
+    }
+}

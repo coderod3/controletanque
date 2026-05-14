@@ -6,6 +6,7 @@
 #include "AuthService.h"
 #include "InputManager.h"
 #include "HardwareMap.h"
+#include "Config.h"
 
 // Instância global para ser usada no main
 TankController controller;
@@ -16,39 +17,40 @@ TankController controller;
 
 TankController::TankController() : 
     _currentState(STATE_IDLE), 
-    _virtualVolume(0.0), 
-    _targetVolume(0.0), 
-    _stateStartTime(0),
-    _lastLevelChangeTime(0),
-    _levelAtPumpStart(0.0),
-    _menuLitros(1), 
+    _targetVolume(0.0f), 
+    _lastExecDisplayVol(0.0f),
+    _menuLitros(5),       
     _menuEncher(true), 
-    _needsUpdate(true) {}
+    _needsUpdate(true),
+    _waitTimer(0),        
+    _nextStateAfterWait(STATE_IDLE),
+    _isWaiting(false),
+    _lastTelemetryTime(0),
+    _lastTelemetryState(STATE_IDLE),
+    _lastTelemetryVol(-100.0f) {}
 
 void TankController::init() {
     // Inicialização de pinos de saída (Bombas)
     pinMode(PIN_BOMBA_ENCHER, OUTPUT);
     pinMode(PIN_BOMBA_ESVAZ, OUTPUT);
     _forceHardwareStop();
-
-    // Sincronização inicial do volume virtual com o real
-    _virtualVolume = tank.getVolume();
+    
+    // O sistema agora depende 100% da leitura em tempo real do TankPhysics
 }
 
 void TankController::update() {
-    // 1. Verificações de Segurança de Hardware
     _checkMaintenanceConditions();
-
-    // 2. Escuta Assíncrona de Comandos Remotos (Nuvem/MQTT)
     _processRemoteCommands();
-
-    // 3. Execução da Máquina de Estados
     _handleStateMachine();
-
-    // 4. Atualização visual de Hardware (LEDs)
     _updateStatusLED();
 
-    // Envia telemetria a cada 1 segundo de forma assíncrona
+    // SSOT: Injeção de estado físico real no filtro de hardware
+    bool isFilling = (digitalRead(PIN_BOMBA_ENCHER) == HIGH);
+    bool isEmptying = (digitalRead(PIN_BOMBA_ESVAZ) == HIGH);
+    
+    tank.setDirection(isFilling, isEmptying);
+    tank.update(); 
+
     _sendTelemetry();
 }
 
@@ -62,26 +64,14 @@ void TankController::_processRemoteCommands() {
     if (connectivity.readPendingCommand(cmd)) {
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, cmd.payload);
-        
-        if (error) {
-            Serial.println("[Controller] Erro ao parsear JSON do comando MQTT");
-            return;
-        }
+        if (error) return; // Retorno limpo e direto sem travar o log
 
         String comando = doc["comando"] | doc["command"] | ""; 
         comando.toUpperCase();
         
-        Serial.println("[Controller] Comando remoto recebido: " + comando);
-
-        if (comando == "ENCHER") {
-            addJob(doc["valor"].as<float>(), true, "WEB");
-        } 
-        else if (comando == "ESVAZIAR") {
-            addJob(doc["valor"].as<float>(), false, "WEB");
-        } 
-        else if (comando == "PARAR") {
-            emergencyStop();
-        } 
+        if (comando == "ENCHER") addJob(doc["valor"].as<float>(), true, "WEB");
+        else if (comando == "ESVAZIAR") addJob(doc["valor"].as<float>(), false, "WEB");
+        else if (comando == "PARAR") emergencyStop();
         else if (comando == "RESET") {
             if (_currentState == STATE_ERROR || _currentState == STATE_EMERGENCY) {
                 _currentState = STATE_IDLE;
@@ -90,7 +80,7 @@ void TankController::_processRemoteCommands() {
             }
         }
         else if (comando == "ESTADO") {
-            forceSyncVirtual();
+            // SSOT: Lê sempre e apenas a variável real. Nada de forçar sync virtual.
             String statusStr = (_currentState == STATE_EXECUTING) ? "EXECUTANDO" : 
                                (_currentState == STATE_ERROR) ? "ERRO" : "IDLE";
             connectivity.queueDigitalTwin(statusStr, tank.getVolume());
@@ -99,76 +89,82 @@ void TankController::_processRemoteCommands() {
             float maxVol = doc["max_vol"];
             float distVazio = doc["dist_vazio"];
             float distCheio = doc["dist_cheio"];
-            
             if (maxVol > 0 && distVazio > distCheio) {
                 tank.syncConfig(maxVol, distVazio, distCheio); 
                 connectivity.queueLog("CALIBRACAO_ATUALIZADA");
-            } else {
-                connectivity.queueLog("ERRO_VALORES_CALIBRACAO_INVALIDOS", true);
             }
         }
         else if (comando == "TESTE_BOMBA") {
             bool encher = doc["encher"] | true;
             _forceHardwareStop();
             digitalWrite(encher ? PIN_BOMBA_ENCHER : PIN_BOMBA_ESVAZ, HIGH);
-            delay(2000); 
+            delay(2000); // Exceção permitida: rotina de stresse de hardware
             _forceHardwareStop();
-            connectivity.queueLog("TESTE_FISICO_BOMBA_OK");
         }
-        // --- FASE 3: SINCRONIZAÇÃO DE USUÁRIOS ---
         else if (comando == "SYNC_USER") {
             String uid = doc["uid"].as<String>();
             String nome = doc["nome"].as<String>();
-            bool ativo = doc["ativo"] | true;
-            
-            if (uid.length() > 0) {
-                auth.syncUser(uid, nome, ativo);
-                connectivity.queueLog("DB_USUARIO_SINCRONIZADO: " + nome);
-            }
+            if (uid.length() > 0) auth.syncUser(uid, nome, doc["ativo"] | true);
         }
         else if (comando == "CLEAR_USERS") {
             auth.clearUsers();
-            connectivity.queueLog("DB_USUARIOS_LIMPA");
         }
     }
 }
 
 void TankController::addJob(float vol, bool encher, String origem) {
+    // Trava de Sanidade: Impede pacotes MQTT corrompidos ou mal-intencionados
+    if (vol <= 0.0f) {
+        connectivity.queueLog("ERRO: VOLUME INVALIDO (" + String(vol) + ")");
+        return;
+    }
+
     TankJob newJob = { vol, encher, origem };
     
     if (_isOperationPossible(newJob)) {
-        _jobQueue.push(newJob);
-        // Atualiza o volume virtual (Soma o que já está na fila + o novo)
-        _virtualVolume += (encher ? vol : -vol);
-        
+        _jobQueue.push_back(newJob); // Usamos push_back com std::deque
         connectivity.queueLog(origem + "_ACEITO: " + String(vol) + "L");
     } else {
-        // FASE 2: Feedback Ativo de Rejeição
-        // 1. Informa o Dashboard remotamente via MQTT
         connectivity.queueLog("NEGADO: LIMITE EXCEDIDO", true);
-        
-        // 2. Informa o operador fisicamente no LCD
         _forceHardwareStop();
         display.showStatus("OPERACAO NEGADA", "Limite Excedido");
-        delay(2000); // Bloqueio visual de 2s aceitável aqui (a bomba está parada)
-        _needsUpdate = true;
+        
+        // Pausa Não-Bloqueante para a UI (se o sistema estiver parado)
+        if (_currentState == STATE_IDLE) {
+            _waitAndGo(STATE_IDLE, 2000); 
+        } else {
+            _needsUpdate = true;
+        }
     }
 }
 
-void TankController::emergencyStop() {
-    // Limpa toda a fila de tarefas
-    while(!_jobQueue.empty()) _jobQueue.pop();
+bool TankController::_isOperationPossible(TankJob job) {
+    // 1. A Verdade Única (Volume Físico Real)
+    float projected = tank.getVolume();
     
+    // 2. Cálculo "On-The-Fly" do que já está na fila
+    for (const auto& pendingJob : _jobQueue) {
+        projected += (pendingJob.encher ? pendingJob.volumeSolicitado : -pendingJob.volumeSolicitado);
+    }
+    
+    // 3. Adiciona o volume do novo job que está a ser testado
+    projected += (job.encher ? job.volumeSolicitado : -job.volumeSolicitado);
+    
+    // 4. Valida se o tanque vai transbordar ou secar
+    if (projected < 0.0f || projected > tank.getMaxVolume()) return false; 
+    
+    return true;
+}
+
+void TankController::emergencyStop() {
+    _jobQueue.clear();
     _forceHardwareStop();
-    forceSyncVirtual(); // Sincroniza o virtual com o real
     
     _currentState = STATE_IDLE;
     _needsUpdate = true;
+    
     connectivity.queueLog("STOP_EMERGENCIA_ACIONADO");
-}
-
-void TankController::forceSyncVirtual() {
-    _virtualVolume = tank.getVolume();
+    connectivity.queueDigitalTwin("IDLE", tank.getVolume());   // Alterado para IDLE
 }
 
 // =============================================================================
@@ -176,6 +172,16 @@ void TankController::forceSyncVirtual() {
 // =============================================================================
 
 void TankController::_handleStateMachine() {
+    // Interceptor Não-Bloqueante: Segura a transição sem travar a CPU
+    if (_isWaiting) {
+        if (millis() >= _waitTimer) {
+            _isWaiting = false;
+            _currentState = _nextStateAfterWait;
+            _needsUpdate = true;
+        }
+        return; // Sai sem executar os estados abaixo
+    }
+
     switch (_currentState) {
         case STATE_IDLE:             _processIdle(); break;
         case STATE_MAINTENANCE:      _processMaintenance(); break;
@@ -209,31 +215,27 @@ void TankController::_processIdle() {
         
         if (auth.isAuthorized()) {
             display.showStatus("ACESSO LIBERADO", auth.getActiveUserName());
-            delay(1500); 
-            _menuLitros = 1; 
+            _menuLitros = 5;      // SSOT: Garante que o menu começa em 5%
             _menuEncher = true; 
-            _needsUpdate = true;
-            _currentState = STATE_LOCAL_CONFIG_DIR;
+            _waitAndGo(STATE_LOCAL_CONFIG_DIR, 1500); // UI livre de delays!
         } else {
             display.showStatus("UID: " + auth.getActiveUserID(), auth.getActiveUserName());
-            delay(4000); 
             auth.logout(); 
-            _needsUpdate = true;
+            _waitAndGo(STATE_IDLE, 4000);             // UI livre de delays!
         }
         return;
     }
 
-    // 3. FASE 2: Consciência de Queda de Rede (Offline Warning no LCD)
+    // 3. Consciência de Queda de Rede (Offline Warning no LCD)
     if (!connectivity.isConnected()) {
         if (millis() - lastOfflineToggle > 2000) {
             isShowingOffline = !isShowingOffline;
-            // Alterna a cada 2s entre o aviso e o nível de água
             if (isShowingOffline) display.showStatus("SISTEMA OFFLINE", "Sem Nuvem");
             else display.showIdle(tank.getVolume());
             lastOfflineToggle = millis();
         }
     } else {
-        if (isShowingOffline) { // O Wi-Fi acabou de voltar
+        if (isShowingOffline) { 
             isShowingOffline = false;
             _needsUpdate = true;
         }
@@ -247,10 +249,15 @@ void TankController::_processIdle() {
     
     // 5. Inicia varredura física do cartão
     auth.update();
-    if (auth.isValidating()) _needsUpdate = true; 
+
+    if (auth.isValidating()) {
+        _needsUpdate = true; 
+    }
     
     // 6. Avança para execução se a fila tiver tarefas
-    if (!_jobQueue.empty()) _currentState = STATE_VALIDATING;
+    if (!_jobQueue.empty()) {
+        _currentState = STATE_VALIDATING;
+    }
 }
 
 void TankController::_processMaintenance() {
@@ -286,14 +293,19 @@ void TankController::_processLocalConfigVol() {
         display.showConfigVol(_menuLitros);
         _needsUpdate = false;
     }
-    if (inputs.isIncClicked()) {
-        _menuLitros++;
+    
+    // Incremento Ágil (Passos de 5%)
+    if (inputs.isIncClicked() && _menuLitros <= 95) {
+        _menuLitros += 5; 
         _needsUpdate = true;
     }
-    if (inputs.isDecClicked() && _menuLitros > 1) {
-        _menuLitros--;
+    
+    // Limite mínimo de 5%
+    if (inputs.isDecClicked() && _menuLitros >= 10) { 
+        _menuLitros -= 5;
         _needsUpdate = true;
     }
+    
     if (inputs.isConfClicked()) {
         _needsUpdate = true;
         _currentState = STATE_LOCAL_CONFIRM;
@@ -314,76 +326,63 @@ void TankController::_processLocalConfirm() {
 }
 
 void TankController::_processValidating() {
-    TankJob currentJob = _jobQueue.front();
-    _levelAtPumpStart = tank.getVolume();
-    _targetVolume = _levelAtPumpStart + (currentJob.encher ? currentJob.volumeSolicitado : -currentJob.volumeSolicitado);
+    // Proteção básica: se não há tarefa por algum erro, volta pro repouso
+    if (_jobQueue.empty()) { 
+        _currentState = STATE_IDLE;
+        return;
+    }
+
+    const auto& currentJob = _jobQueue.front();
     
-    _stateStartTime = millis();
-    _lastLevelChangeTime = millis();
+    // SSOT Perfeita: Calcula o alvo com base na água física exata deste milissegundo
+    _targetVolume = tank.getVolume() + (currentJob.encher ? currentJob.volumeSolicitado : -currentJob.volumeSolicitado);
+    
     _needsUpdate = true;
     
-    // CORRIGIDO: Envio assíncrono não-bloqueante para o Core 0
     connectivity.queueDigitalTwin("EXECUTANDO", tank.getVolume());
-    
     _currentState = STATE_EXECUTING;
 }
 
 void TankController::_processExecuting() {
-    static float lastExecV = 0;
+    if (_jobQueue.empty()) {
+        _forceHardwareStop();
+        _currentState = STATE_IDLE;
+        return;
+    }
 
-    // Atualiza o display apenas se houver mudança significativa no nível
-    if (_needsUpdate || abs(tank.getVolume() - lastExecV) > 0.05) {
-        TankJob job = _jobQueue.front();
+    const TankJob job = _jobQueue.front();
+
+    // Atualização do LCD
+    if (_needsUpdate || fabs(tank.getVolume() - _lastExecDisplayVol) >= 0.5f) {
         display.showExecuting(tank.getVolume(), _targetVolume, job.encher);
-        lastExecV = tank.getVolume();
+        _lastExecDisplayVol = tank.getVolume();
         _needsUpdate = false;
     }
 
-    // Controle físico das bombas
-    TankJob job = _jobQueue.front();
-    if (job.encher) {
-        digitalWrite(PIN_BOMBA_ENCHER, HIGH);
-        digitalWrite(PIN_BOMBA_ESVAZ, LOW);
-    } else {
-        digitalWrite(PIN_BOMBA_ESVAZ, HIGH);
-        digitalWrite(PIN_BOMBA_ENCHER, LOW);
-    }
+    // Aciona bombas
+    digitalWrite(PIN_BOMBA_ENCHER, job.encher ? HIGH : LOW);
+    digitalWrite(PIN_BOMBA_ESVAZ,  job.encher ? LOW : HIGH);
 
-    // Verificação de conclusão
-    bool atingiuAlvo = job.encher ? (tank.getVolume() >= _targetVolume) : (tank.getVolume() <= _targetVolume);    
+    // Verifica conclusão
+    bool atingiuAlvo = job.encher ? 
+        (tank.getVolume() >= _targetVolume) : 
+        (tank.getVolume() <= _targetVolume);
 
     if (atingiuAlvo) {
         float nivelFinal = tank.getVolume();
         _forceHardwareStop();
 
-        // CORRIGIDO: Registro de Auditoria Assíncrono via IPC Queue (Core 1 -> Core 0)
+        float startVol = _targetVolume - (job.encher ? job.volumeSolicitado : -job.volumeSolicitado);
+
         connectivity.queueAuditLog(auth.getActiveUserID(), 
                         job.encher ? "ABASTECER" : "DRENAR", 
-                        job.volumeSolicitado, 
-                        _levelAtPumpStart, 
-                        nivelFinal);
+                        job.volumeSolicitado, startVol, nivelFinal);
 
-        // CORRIGIDO: Atualização assíncrona do Digital Twin
         connectivity.queueDigitalTwin("IDLE", nivelFinal);
 
-        _jobQueue.pop();
+        _jobQueue.pop_front();
         _needsUpdate = true;
         _currentState = STATE_IDLE;
-    }
-
-    // Proteção: Timeout da Bomba (Verifica se o nível está mudando)
-    if (millis() - _lastLevelChangeTime > BOMBA_TIMEOUT_MS) {
-        if (abs(tank.getVolume() - _levelAtPumpStart) < 0.05) { // VOLUME_EPSILON
-            _needsUpdate = true;
-            _currentState = STATE_ERROR;
-            connectivity.queueLog("ERRO: BOMBA TRAVADA");
-            
-            // CORRIGIDO: Digital Twin assíncrono em caso de erro
-            connectivity.queueDigitalTwin("ERRO: BOMBA TRAVADA", tank.getVolume());
-        } else {
-            _lastLevelChangeTime = millis();
-            _levelAtPumpStart = tank.getVolume();
-        }
     }
 }
 
@@ -427,55 +426,62 @@ void TankController::_checkMaintenanceConditions() {
     }
 }
 
-bool TankController::_isOperationPossible(TankJob job) {
-    float projected = _virtualVolume + (job.encher ? job.volumeSolicitado : -job.volumeSolicitado);
-    // Valida contra 0 e contra o volume máximo da calibração atual
-    if (projected < 0 || projected > tank.getMaxVolume()) return false; 
-    return true;
-}
-
 void TankController::_updateStatusLED() {
     if (_currentState == STATE_IDLE) {
-        analogWrite(PIN_LED_R, 0); analogWrite(PIN_LED_G, 100); analogWrite(PIN_LED_B, 0);
-    } else if (_currentState == STATE_EXECUTING) {
-        bool enchendo = _jobQueue.front().encher;
-        analogWrite(PIN_LED_R, enchendo ? 0 : 255); 
+        // Verde suave para repouso
+        analogWrite(PIN_LED_R, 0); 
+        analogWrite(PIN_LED_G, 100); 
+        analogWrite(PIN_LED_B, 0);
+    } 
+    else if (_currentState == STATE_EXECUTING) {
+        // Proteção Crítica: Só acessa a fila se ela não estiver vazia
+        if (!_jobQueue.empty()) {
+            bool enchendo = _jobQueue.front().encher;
+            // Azul para encher, Vermelho/Roxo para esvaziar
+            analogWrite(PIN_LED_R, enchendo ? 0 : 255); 
+            analogWrite(PIN_LED_G, 0); 
+            analogWrite(PIN_LED_B, enchendo ? 255 : 0);
+        }
+    } 
+    else if (_currentState == STATE_EMERGENCY || _currentState == STATE_ERROR) {
+        // Vermelho brilhante para falhas
+        analogWrite(PIN_LED_R, 255); 
         analogWrite(PIN_LED_G, 0); 
-        analogWrite(PIN_LED_B, enchendo ? 255 : 0);
-    } else if (_currentState == STATE_EMERGENCY || _currentState == STATE_ERROR) {
-        analogWrite(PIN_LED_R, 255); analogWrite(PIN_LED_G, 0); analogWrite(PIN_LED_B, 0);
+        analogWrite(PIN_LED_B, 0);
     }
 }
 
 void TankController::_sendTelemetry() {
     unsigned long agora = millis();
-    static float ultimoVolumeEnviado = -100.0;
-    static unsigned long ultimoEnvio = 0;
-    
     bool deveEnviar = false;
 
-    // Em repouso: Verifica a cada 10s. Envia se variar mais de 0.5L
+    // Detecta mudança de estado instantaneamente
+    if (_currentState != _lastTelemetryState) deveEnviar = true;
+
+    // Avaliação em repouso
     if (_currentState == STATE_IDLE) {
-        if (agora - ultimoEnvio > 10000) {
-            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.5) deveEnviar = true;
-            ultimoEnvio = agora; // Reseta o timer pra não avaliar toda hora
+        if (agora - _lastTelemetryTime > TELEMETRY_IDLE_INTERVAL_MS) {
+            if (fabs(tank.getVolume() - _lastTelemetryVol) >= TELEMETRY_IDLE_DELTA_L) deveEnviar = true;
+            _lastTelemetryTime = agora; 
         }
     } 
-    // Em execução: Envia a cada 500ms se variar mais de 0.1L
+    // Avaliação em execução
     else if (_currentState == STATE_EXECUTING) {
-        if (agora - ultimoEnvio > 500) {
-            if (abs(tank.getVolume() - ultimoVolumeEnviado) > 0.1) deveEnviar = true;
-            ultimoEnvio = agora;
+        if (agora - _lastTelemetryTime > TELEMETRY_EXEC_INTERVAL_MS) {
+            if (fabs(tank.getVolume() - _lastTelemetryVol) >= TELEMETRY_EXEC_DELTA_L) deveEnviar = true;
+            _lastTelemetryTime = agora;
         }
     }
-    // Mudança de status: Se entrou em erro, emergência, ou comando de estado
+    // Mudança de status crítico
     else {
-        if (agora - ultimoEnvio > 2000) deveEnviar = true;
+        if (agora - _lastTelemetryTime > 2000) deveEnviar = true;
     }
 
     if (deveEnviar) {
-        ultimoVolumeEnviado = tank.getVolume();
-        ultimoEnvio = agora;
+        // Atualiza as variáveis da classe (OOP)
+        _lastTelemetryVol = tank.getVolume();
+        _lastTelemetryState = _currentState;
+        _lastTelemetryTime = agora;
         
         String statusStr;
         switch(_currentState) {
@@ -486,6 +492,13 @@ void TankController::_sendTelemetry() {
             default: statusStr = "DESCONHECIDO"; break;
         }
 
-        connectivity.queueTelemetria(ultimoVolumeEnviado, statusStr);
+        connectivity.queueTelemetria(_lastTelemetryVol, statusStr);
     }
 }
+
+void TankController::_waitAndGo(SystemState nextState, unsigned long ms) {
+    _waitTimer = millis() + ms;
+    _nextStateAfterWait = nextState;
+    _isWaiting = true;
+}
+

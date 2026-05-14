@@ -2,7 +2,7 @@
 #define TANK_CONTROLLER_H
 
 #include <Arduino.h>
-#include <queue>
+#include <deque> 
 #include "HardwareMap.h"
 
 // Definições de Estado do Sistema (FSM)
@@ -18,7 +18,7 @@ enum SystemState {
     STATE_MAINTENANCE
 };
 
-// Estrutura de Job (Tarefa)
+// Estrutura de Job
 struct TankJob {
     float volumeSolicitado;
     bool encher;
@@ -31,30 +31,39 @@ public:
     void init();
     void update();
     
-    // Comandos externos
     void addJob(float vol, bool encher, String origem);
     void emergencyStop();
-    void forceSyncVirtual();
 
-    // Getters de estado
-    SystemState getState() { return _currentState; }
-    bool isIdle() { return _currentState == STATE_IDLE; }
+    // Getters
+    SystemState getState() const { return _currentState; }
+    bool isIdle() const { return _currentState == STATE_IDLE; }
 
 private:
-    volatile SystemState _currentState;
-    std::queue<TankJob> _jobQueue;
+    SystemState _currentState;
+    std::deque<TankJob> _jobQueue;
 
-    float _virtualVolume;    
-    float _targetVolume;     
-    unsigned long _stateStartTime;
-    unsigned long _lastLevelChangeTime;
-    float _levelAtPumpStart;
+    // Controle Físico
+    float _targetVolume = 0.0f;
+    float _lastExecDisplayVol = 0.0f;
 
-    int _menuLitros;
-    bool _menuEncher;
-    bool _needsUpdate;
+    // Navegação Local (Menu)
+    int _menuLitros = 0;
+    bool _menuEncher = true;
+    bool _needsUpdate = false;
 
-    // Handlers de Estado
+    // Controle Não-Bloqueante
+    unsigned long _waitTimer = 0;
+    SystemState _nextStateAfterWait = STATE_IDLE;
+    bool _isWaiting = false;
+
+    // Telemetria
+    unsigned long _lastTelemetryTime = 0;
+    SystemState _lastTelemetryState = STATE_IDLE;
+    float _lastTelemetryVol = -100.0f;
+
+    // Métodos Privados
+    void _waitAndGo(SystemState nextState, unsigned long ms);
+
     void _handleStateMachine();
     void _processIdle();
     void _processMaintenance();
@@ -66,17 +75,11 @@ private:
     void _processError();
     void _processEmergency();
 
-    // Suporte e Segurança
     void _forceHardwareStop();
     bool _isOperationPossible(TankJob job);
     void _updateStatusLED();
     void _checkMaintenanceConditions();
-
-    // NOVO: Processador de Comandos da Nuvem
     void _processRemoteCommands();
-    
-    // NOVO: Telemetria Contínua
-    unsigned long _lastTelemetryTime = 0;
     void _sendTelemetry();
 };
 

@@ -29,7 +29,7 @@
 // =============================================================================
 #define BOMBA_TIMEOUT_MS  5000
 #define VOLUME_EPSILON    0.05
-#define SENSOR_SAMPLES    10
 #define AUTH_SESSION_TIME 30000
+
 
 #endif
