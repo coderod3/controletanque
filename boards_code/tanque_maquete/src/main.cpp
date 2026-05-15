@@ -1,61 +1,156 @@
 #include <Arduino.h>
-#include "Config.h"
 #include "HardwareMap.h"
-#include "WiFiService.h"
-#include "DisplayManager.h"
-#include "TankPhysics.h"
-#include "InputManager.h"
-#include "AuthService.h"
-#include "TankController.h"
+#include "Config.h"
 
-// =============================================================================
-// INTERRUPÇÃO DE HARDWARE (SAFETY-FIRST)
-// =============================================================================
-// ISR de baixíssima latência. Se a boia de overflow bater, corta as bombas
-// instantaneamente no nível de interrupção do processador.
-void IRAM_ATTR handleOverflowInterrupt() {
-    controller.emergencyStop();
-}
+// APIs de Hardware e Lógica
+#include "Sensor.h"
+#include "Bombas.h"
+#include "Botoes.h"
+#include "Tela.h"
+#include "ControleNivel.h"
+#include "LeitorRFID.h"
 
-// =============================================================================
-// SETUP DO SISTEMA
-// =============================================================================
+// Novos Módulos de Integração
+#include "Rede.h"      // Orquestrador do Core 0
+#include "Usuarios.h"  // Banco de dados local na Flash
+#include "Comandos.h"  // Intérprete de mensagens MQTT
+
+// Estados do Sistema
+enum EstadoSistema { ESPERANDO_RFID, MENU_AJUSTE, EXECUTANDO };
+EstadoSistema estadoAtual = ESPERANDO_RFID;
+
+float alvoVol = 0.0;
+bool menuIniciado = false;
+unsigned long delayTelemetria = 0;
+
 void setup() {
     Serial.begin(115200);
-    Serial.println("\n--- [NEXUS OS] INICIALIZANDO FIRMWARE INTEGRAL ---");
+    Serial.println("\n--- NEXUS OS | INICIALIZANDO ---");
+    
+    // 1. Inicializa Infraestrutura de Rede (Dispara o Core 0)
+    Rede.iniciar();
+    Usuarios.iniciar();
+    
+    // 2. Inicializa Hardware e Lógica (Core 1)
+    Sensor.iniciar();
+    Bombas.iniciar();
+    Botoes.iniciar();
+    Tela.iniciar();
+    ControleNivel.iniciar();
+    LeitorRFID.iniciar();
+    Comandos.iniciar();
 
-    // 1. Inicializa Rede e Serviços de Fundo (Core 0)
-    connectivity.init();
+    // 3. Configuração de Periféricos
+    pinMode(PIN_LED_R, OUTPUT);
+    pinMode(PIN_LED_G, OUTPUT);
+    pinMode(PIN_LED_B, OUTPUT);
 
-    // 2. Inicializa Módulos de Hardware Físico (Core 1)
-    tank.init();        // VL53L1X / Ultrassónico
-    display.init();     // Tela OLED
-    auth.init();        // RFID Reader
-    inputs.init();      // Botões de comando com Debounce
-    controller.init();  // Máquina de estados (FSM) e saídas digitais (Bombas)
-
-    // 3. Configuração de Segurança por Interrupção (Transbordo)
-    pinMode(PIN_OVERFLOW, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(PIN_OVERFLOW), handleOverflowInterrupt, FALLING);
-
-    display.showStatus("NEXUS OS", "SISTEMA ONLINE");
-    Serial.println("[System] Setup concluído. Core 1 livre para loop de controle.");
+    Tela.atualizar("NEXUS OS", "SISTEMA ONLINE");
+    delay(1000);
 }
 
-// =============================================================================
-// LOOP PRINCIPAL (CORE 1 - EXECUÇÃO FÍSICA DETERMINÍSTICA)
-// =============================================================================
 void loop() {
-    // 1. Atualiza leituras físicas passivas e médias móveis
-    tank.update();
+    // ---------------------------------------------------------
+    // 0. SINCRONIZAÇÃO E TELEMETRIA
+    // ---------------------------------------------------------
+    // O intérprete verifica a fila de rede e executa ordens do site
+    Comandos.monitorar();
 
-    // 2. Atualiza estado de clique/pressão dos botões físicos
-    inputs.update();
+    bool bombaEnchendo = digitalRead(PIN_BOMBA_ENCHER);
+    bool bombaEsvaziando = digitalRead(PIN_BOMBA_ESVAZ);
+    Sensor.setDirecao(bombaEnchendo, bombaEsvaziando);
 
-    // 3. Executa a máquina de estados (FSM), processos remotos/locais e telemetria
-    // NOTA: O RFID é lido internamente por aqui (dentro do estado IDLE via auth.update())
-    controller.update();
+    float volAtual = Sensor.lerPorcentagem();
+    ComandoBotao btn = Botoes.ler();
 
-    // 4. Delay obrigatório de 10ms para alimentar o Watchdog do FreeRTOS
-    delay(10);
+    // Envia telemetria para o site a cada 2 segundos
+    if (millis() - delayTelemetria > 2000) {
+        String statusStr = (estadoAtual == EXECUTANDO) ? "EXECUTANDO" : "IDLE";
+        String json = "{\"nivel\":" + String(volAtual, 1) + ",\"estado\":\"" + statusStr + "\"}";
+        Rede.enviar(TOPIC_TELEMETRIA, json);
+        delayTelemetria = millis();
+    }
+
+    // ---------------------------------------------------------
+    // 1. MÁQUINA DE ESTADOS (CORE 1)
+    // ---------------------------------------------------------
+    switch (estadoAtual) {
+        
+        case ESPERANDO_RFID:
+            Tela.atualizar("ACESSO RESTRITO", "PASSE O CARTAO");
+            
+            {
+                String uidLido = LeitorRFID.lerTag();
+                if (uidLido != "") {
+                    String nomeUser;
+                    // Validação local (Segurança Offline)
+                    if (Usuarios.autenticar(uidLido, nomeUser)) {
+                        Tela.atualizar("OLA, " + nomeUser, "ACESSO LIBERADO");
+                        Rede.enviar("tanque/logs", "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
+                        delay(1500);
+                        estadoAtual = MENU_AJUSTE;
+                        menuIniciado = false;
+                        Tela.limpar();
+                    } else {
+                        Tela.atualizar("TAG INVALIDA", uidLido);
+                        Rede.enviar("tanque/logs", "{\"msg\": \"Tentativa de acesso negada: " + uidLido + "\"}");
+                        delay(1500);
+                    }
+                }
+            }
+            break;
+
+        case MENU_AJUSTE:
+            if (!menuIniciado) {
+                alvoVol = round(volAtual / 5.0) * 5.0; 
+                alvoVol = constrain(alvoVol, 0.0, 100.0);
+                menuIniciado = true;
+            }
+
+            Tela.atualizar("AJUSTAR ALVO", String(alvoVol, 0) + " %");
+            
+            if (btn == MAIS)  alvoVol += 5.0;
+            if (btn == MENOS) alvoVol -= 5.0;
+            alvoVol = constrain(alvoVol, 0.0, 100.0);
+
+            if (btn == CONFIRMA) { 
+                ControleNivel.setarAlvo(alvoVol);
+                estadoAtual = EXECUTANDO;
+            }
+            break;
+
+        case EXECUTANDO:
+            ControleNivel.atualizar(volAtual);
+            Tela.atualizar("ALVO: " + String(alvoVol, 0) + "%", "ATU : " + String(volAtual, 1) + "%");
+
+            // Sai se terminar o trabalho ou se houver cancelamento manual (Confirma)
+            // Também permite que comandos remotos (via monitorar) mudem o estado
+            if (!ControleNivel.estaTrabalhando() || btn == CONFIRMA) {
+                ControleNivel.parar();
+                estadoAtual = ESPERANDO_RFID; 
+                Tela.limpar();
+            }
+            break;
+    }
+
+    // ---------------------------------------------------------
+    // 2. FEEDBACK VISUAL (LED RGB PWM)
+    // ---------------------------------------------------------
+    if (bombaEnchendo) {
+        analogWrite(PIN_LED_R, 0);
+        analogWrite(PIN_LED_G, 255);
+        analogWrite(PIN_LED_B, 0);
+    } 
+    else if (bombaEsvaziando) {
+        analogWrite(PIN_LED_R, 255);
+        analogWrite(PIN_LED_G, 0);
+        analogWrite(PIN_LED_B, 0);
+    } 
+    else {
+        analogWrite(PIN_LED_R, 0);
+        analogWrite(PIN_LED_G, 0);
+        analogWrite(PIN_LED_B, 100);
+    }
+
+    delay(10); // Essencial para o Watchdog do FreeRTOS
 }
