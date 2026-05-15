@@ -54,8 +54,15 @@ void loop() {
     // 0. SINCRONIZAÇÃO E TELEMETRIA
     // ---------------------------------------------------------
     // O intérprete verifica a fila de rede e executa ordens do site
+    // 0. Sincronização e Telemetria
     Comandos.monitorar();
 
+    // ADICIONE ESTAS LINHAS AQUI:
+    if (ControleNivel.estaTrabalhando() && estadoAtual != EXECUTANDO) {
+        estadoAtual = EXECUTANDO;
+        menuIniciado = false; 
+    }
+    
     bool bombaEnchendo = digitalRead(PIN_BOMBA_ENCHER);
     bool bombaEsvaziando = digitalRead(PIN_BOMBA_ESVAZ);
     Sensor.setDirecao(bombaEnchendo, bombaEsvaziando);
