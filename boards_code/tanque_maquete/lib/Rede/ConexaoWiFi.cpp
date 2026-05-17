@@ -10,7 +10,7 @@ void ConexaoWiFiAPI::iniciar() {
 
     WiFi.mode(WIFI_STA);
 
-    // Configuração de IP Estático conforme solicitado (.155)
+    // Configuração de IP Estático conforme solicitado (.115)
     // Ajustado para a sub-rede 192.168.1.x (comum na maioria dos roteadores)
     IPAddress local_IP(192, 168, 0, 115);
     IPAddress gateway(192, 168, 0, 1);      

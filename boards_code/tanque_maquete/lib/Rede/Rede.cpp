@@ -33,7 +33,7 @@ void RedeAPI::_taskRede(void* pvParameters) {
     GerenciadorOTA.iniciar();
 
     for (;;) {
-        // 1. Mantém o link WiFi (IP Fixo .155)
+        // 1. Mantém o link WiFi (IP Fixo .115)
         ConexaoWiFi.manter();
 
         if (ConexaoWiFi.estaConectado()) {
