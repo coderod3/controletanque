@@ -51,13 +51,10 @@ void setup() {
 
 void loop() {
     // ---------------------------------------------------------
-    // 0. SINCRONIZAÇÃO E TELEMETRIA
+    // 0. MONITORAMENTO E SINCRONIZAÇÃO
     // ---------------------------------------------------------
-    // O intérprete verifica a fila de rede e executa ordens do site
-    // 0. Sincronização e Telemetria
     Comandos.monitorar();
 
-    // ADICIONE ESTAS LINHAS AQUI:
     if (ControleNivel.estaTrabalhando() && estadoAtual != EXECUTANDO) {
         estadoAtual = EXECUTANDO;
         menuIniciado = false; 
@@ -70,7 +67,7 @@ void loop() {
     float volAtual = Sensor.lerPorcentagem();
     ComandoBotao btn = Botoes.ler();
 
-    // Envia telemetria para o site a cada 2 segundos
+    // Telemetria a cada 2 segundos
     if (millis() - delayTelemetria > 2000) {
         String statusStr = (estadoAtual == EXECUTANDO) ? "EXECUTANDO" : "IDLE";
         String json = "{\"nivel\":" + String(volAtual, 1) + ",\"estado\":\"" + statusStr + "\"}";
@@ -79,28 +76,28 @@ void loop() {
     }
 
     // ---------------------------------------------------------
-    // 1. MÁQUINA DE ESTADOS (CORE 1)
+    // 1. MÁQUINA DE ESTADOS
     // ---------------------------------------------------------
     switch (estadoAtual) {
         
         case ESPERANDO_RFID:
-            Tela.atualizar("ACESSO RESTRITO", "PASSE O CARTAO");
+            Tela.atualizar("ACESSO RESTRITO", "Nivel: " + String(volAtual, 1) + "%");
             
             {
                 String uidLido = LeitorRFID.lerTag();
                 if (uidLido != "") {
                     String nomeUser;
-                    // Validação local (Segurança Offline)
                     if (Usuarios.autenticar(uidLido, nomeUser)) {
                         Tela.atualizar("OLA, " + nomeUser, "ACESSO LIBERADO");
                         Rede.enviar("tanque/logs", "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
+                        Rede.enviar(TOPIC_TELEMETRIA, "{\"status\": \"OCUPADO\"}");
                         delay(1500);
                         estadoAtual = MENU_AJUSTE;
                         menuIniciado = false;
                         Tela.limpar();
                     } else {
                         Tela.atualizar("TAG INVALIDA", uidLido);
-                        Rede.enviar("tanque/logs", "{\"msg\": \"Tentativa de acesso negada: " + uidLido + "\"}");
+                        Rede.enviar("tanque/logs", "{\"msg\": \"Tentativa negada: " + uidLido + "\"}");
                         delay(1500);
                     }
                 }
@@ -114,7 +111,7 @@ void loop() {
                 menuIniciado = true;
             }
 
-            Tela.atualizar("AJUSTAR ALVO", String(alvoVol, 0) + " %");
+            Tela.atualizar("ALVO: " + String(alvoVol, 0) + "%", "Atual: " + String(volAtual, 1) + "%");
             
             if (btn == MAIS)  alvoVol += 5.0;
             if (btn == MENOS) alvoVol -= 5.0;
@@ -122,18 +119,23 @@ void loop() {
 
             if (btn == CONFIRMA) { 
                 ControleNivel.setarAlvo(alvoVol);
+                ControleNivel.setarAlvoVolume(alvoVol);
                 estadoAtual = EXECUTANDO;
             }
             break;
 
         case EXECUTANDO:
             ControleNivel.atualizar(volAtual);
-            Tela.atualizar("ALVO: " + String(alvoVol, 0) + "%", "ATU : " + String(volAtual, 1) + "%");
+            Tela.atualizar("ALVO: " + String(ControleNivel.obterAlvoVol(), 0) + "%", 
+                          "Atual: " + String(volAtual, 1) + "%");
 
-            // Sai se terminar o trabalho ou se houver cancelamento manual (Confirma)
-            // Também permite que comandos remotos (via monitorar) mudem o estado
             if (!ControleNivel.estaTrabalhando() || btn == CONFIRMA) {
+                if (btn == CONFIRMA) {
+                    Rede.enviar("tanque/logs", "{\"msg\": \"PARADA DE EMERGENCIA acionada pelo usuario\"}");
+                    Rede.enviar(TOPIC_TELEMETRIA, "{\"status\": \"PARADA_EMERGENCIA\"}");
+                }
                 ControleNivel.parar();
+                Rede.enviar(TOPIC_TELEMETRIA, "{\"status\": \"IDLE\"}");
                 estadoAtual = ESPERANDO_RFID; 
                 Tela.limpar();
             }
@@ -141,7 +143,7 @@ void loop() {
     }
 
     // ---------------------------------------------------------
-    // 2. FEEDBACK VISUAL (LED RGB PWM)
+    // 2. FEEDBACK VISUAL (LED RGB)
     // ---------------------------------------------------------
     if (bombaEnchendo) {
         analogWrite(PIN_LED_R, 0);
@@ -159,5 +161,5 @@ void loop() {
         analogWrite(PIN_LED_B, 100);
     }
 
-    delay(10); // Essencial para o Watchdog do FreeRTOS
+    delay(10);
 }

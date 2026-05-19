@@ -8,9 +8,15 @@ private:
     unsigned long ultimoTempoLeitura;
     bool estadoEnchendo;
     bool estadoEsvaziando;
+    
+    float amostrasBuffer[10];
+    uint8_t indiceAmostra;
+    
+    float _calcularMediana(float amostras[], uint8_t tamanho);
+    float _limitarSlew(float novaDistancia, float ultimaDistancia, float deltaTempoSeg);
 public:
     void iniciar();
-    void setDirecao(bool enchendo, bool esvaziando); // Avisa o sensor do estado físico
+    void setDirecao(bool enchendo, bool esvaziando);
     float lerCm();
     float lerPorcentagem();
 };

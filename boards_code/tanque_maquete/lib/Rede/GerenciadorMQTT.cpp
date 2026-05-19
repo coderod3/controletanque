@@ -7,12 +7,13 @@
 static WiFiClientSecure espClient;
 static PubSubClient mqttClient(espClient);
 GerenciadorMQTTAPI GerenciadorMQTT;
+static bool wasConnected = false;
 
 void GerenciadorMQTTAPI::iniciar() {
-    // Configuração de segurança para HiveMQ Cloud
     espClient.setInsecure(); 
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(this->_callback);
+    wasConnected = false;
     Serial.println("[MQTT] Servico inicializado.");
 }
 
@@ -22,18 +23,28 @@ bool GerenciadorMQTTAPI::conectado() {
 
 void GerenciadorMQTTAPI::processar() {
     if (!mqttClient.connected()) {
+        if (wasConnected) {
+            // Transitou de conectado para desconectado
+            Serial.println("[MQTT] Conexão perdida. Publicando status OFFLINE...");
+            wasConnected = false;
+        }
         _tentarReconectar();
         return;
     }
 
+    // Se estava desconectado e agora reconectou
+    if (!wasConnected) {
+        Serial.println("[MQTT] Reconectado! Publicando status ONLINE...");
+        mqttClient.publish(TOPIC_TELEMETRIA, "{\"status\": \"ONLINE\", \"timestamp\": \"" + String(millis()) + "\"}");
+        wasConnected = true;
+    }
+
     mqttClient.loop();
 
-    // --- LOGÍSTICA DE SAÍDA (TX) ---
-    // O MQTT retira da fila e envia para a nuvem
     MensagemSaida msg;
     if (xQueueReceive(filaTX, &msg, 0) == pdPASS) {
         mqttClient.publish(msg.topico, msg.payload);
-        Serial.print("[MQTT] Enviado para: ");
+        Serial.print("[MQTT] Enviado: ");
         Serial.println(msg.topico);
     }
 }
@@ -45,26 +56,24 @@ void GerenciadorMQTTAPI::_tentarReconectar() {
 
     Serial.print("[MQTT] Conectando ao Broker... ");
     
-    // Configuração de Last Will (LWT) inspirada no seu código antigo
     const char* lwtTopic = TOPIC_TELEMETRIA;
     const char* lwtMsg = "{\"status\": \"OFFLINE\"}";
 
     if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS, lwtTopic, 0, true, lwtMsg)) {
         Serial.println("OK!");
         mqttClient.subscribe(TOPIC_COMANDO);
+        wasConnected = true;
     } else {
         Serial.print("Falha, rc=");
         Serial.println(mqttClient.state());
+        wasConnected = false;
     }
 }
 
-// --- LOGÍSTICA DE ENTRADA (RX) ---
-// Quando chega algo do site, o MQTT empacota e joga na fila para o Core 1
 void GerenciadorMQTTAPI::_callback(char* topic, byte* payload, unsigned int length) {
     ComandoEntrada cmd;
     memset(cmd.payload, 0, sizeof(cmd.payload));
 
-    // Copia segura dos dados brutos
     unsigned int len = (length < sizeof(cmd.payload) - 1) ? length : sizeof(cmd.payload) - 1;
     memcpy(cmd.payload, payload, len);
 

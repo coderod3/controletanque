@@ -7,12 +7,15 @@ private:
     float alvoCm;
     float alvoVol;
     bool ativo;
+    unsigned long ultimaAtualizacao;
 public:
     void iniciar();
     void setarAlvo(float centimetros);
-    void parar(); // Corte de emergência
-    void atualizar(float distanciaAtual); // Chamado a cada ciclo pelo main
+    void setarAlvoVolume(float volumeL);
+    void parar();
+    void atualizar(float distanciaAtual);
     bool estaTrabalhando();
+    float obterAlvoVol();
 };
 
 extern ControleNivelAPI ControleNivel;
