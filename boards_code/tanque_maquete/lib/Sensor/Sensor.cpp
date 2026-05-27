@@ -34,16 +34,15 @@ float SensorAPI::lerCm() {
     float distanciaLida = (duracao * 0.0343f) / 2.0f;
 
     if (ultimaDistancia > 0.0) {
-        // REGRA DIRECIONAL (Efeito Catraca Anti-Ondas)
-        // Lembre-se: Encher = Distância diminui. Esvaziar = Distância aumenta.
+        // Efeito Catraca Anti-Ondas
         if (estadoEnchendo && distanciaLida > ultimaDistancia) {
-            distanciaLida = ultimaDistancia; // Ignora o pulo (onda descendo)
+            distanciaLida = ultimaDistancia;
         }
         else if (estadoEsvaziando && distanciaLida < ultimaDistancia) {
-            distanciaLida = ultimaDistancia; // Ignora o pulo (onda subindo)
+            distanciaLida = ultimaDistancia;
         }
         
-        // Filtro EMA (Suavização final)
+        // Filtro EMA
         ultimaDistancia = (0.2f * distanciaLida) + (0.8f * ultimaDistancia);
     } else {
         ultimaDistancia = distanciaLida;
@@ -57,4 +56,10 @@ float SensorAPI::lerPorcentagem() {
     if (cm >= TANK_HEIGHT_EMPTY) return 0.0f;
     if (cm <= TANK_HEIGHT_FULL) return 100.0f;
     return ((TANK_HEIGHT_EMPTY - cm) / (TANK_HEIGHT_EMPTY - TANK_HEIGHT_FULL)) * 100.0f;
+}
+
+float SensorAPI::lerLitros() {
+    // Como o tanque do dashboard foi definido como 100L, a % é igual aos Litros.
+    // Se fosse um tanque de 2L, faríamos: return lerPorcentagem() * 0.02f;
+    return lerPorcentagem(); 
 }

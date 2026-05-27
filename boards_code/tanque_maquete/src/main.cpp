@@ -45,7 +45,7 @@ void setup() {
     pinMode(PIN_LED_G, OUTPUT);
     pinMode(PIN_LED_B, OUTPUT);
 
-    Tela.atualizar("NEXUS OS", "SISTEMA ONLINE");
+    Tela.atualizar("    NEXUS OS    ", " SISTEMA ONLINE ");
     delay(1000);
 }
 
@@ -53,11 +53,9 @@ void loop() {
     // ---------------------------------------------------------
     // 0. SINCRONIZAÇÃO E TELEMETRIA
     // ---------------------------------------------------------
-    // O intérprete verifica a fila de rede e executa ordens do site
-    // 0. Sincronização e Telemetria
     Comandos.monitorar();
 
-    // ADICIONE ESTAS LINHAS AQUI:
+    // Intercepta comandos vindos da Web para forçar o estado de Execução
     if (ControleNivel.estaTrabalhando() && estadoAtual != EXECUTANDO) {
         estadoAtual = EXECUTANDO;
         menuIniciado = false; 
@@ -67,12 +65,19 @@ void loop() {
     bool bombaEsvaziando = digitalRead(PIN_BOMBA_ESVAZ);
     Sensor.setDirecao(bombaEnchendo, bombaEsvaziando);
 
-    float volAtual = Sensor.lerPorcentagem();
+    float volAtual = Sensor.lerLitros();
     ComandoBotao btn = Botoes.ler();
 
     // Envia telemetria para o site a cada 2 segundos
     if (millis() - delayTelemetria > 2000) {
-        String statusStr = (estadoAtual == EXECUTANDO) ? "EXECUTANDO" : "IDLE";
+        
+        // CORREÇÃO DO BUG 1: Dicionário traduzido para o React ("filling", "draining", "idle")
+        String statusStr = "idle";
+        if (estadoAtual == EXECUTANDO) {
+            if (bombaEnchendo) statusStr = "filling";
+            else if (bombaEsvaziando) statusStr = "draining";
+        }
+        
         String json = "{\"nivel\":" + String(volAtual, 1) + ",\"estado\":\"" + statusStr + "\"}";
         Rede.enviar(TOPIC_TELEMETRIA, json);
         delayTelemetria = millis();
@@ -84,22 +89,22 @@ void loop() {
     switch (estadoAtual) {
         
         case ESPERANDO_RFID:
-            Tela.atualizar("ACESSO RESTRITO", "PASSE O CARTAO");
+            Tela.atualizar("ACESSO RESTRITO ", " PASSE O CARTAO ");
             
             {
                 String uidLido = LeitorRFID.lerTag();
                 if (uidLido != "") {
                     String nomeUser;
-                    // Validação local (Segurança Offline)
                     if (Usuarios.autenticar(uidLido, nomeUser)) {
-                        Tela.atualizar("OLA, " + nomeUser, "ACESSO LIBERADO");
+                        String saudacao = "OLA, " + nomeUser.substring(0, 11);
+                        Tela.atualizar(saudacao, "ACESSO LIBERADO ");
                         Rede.enviar("tanque/logs", "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
                         delay(1500);
                         estadoAtual = MENU_AJUSTE;
                         menuIniciado = false;
                         Tela.limpar();
                     } else {
-                        Tela.atualizar("TAG INVALIDA", uidLido);
+                        Tela.atualizar("  TAG INVALIDA  ", uidLido.substring(0, 16));
                         Rede.enviar("tanque/logs", "{\"msg\": \"Tentativa de acesso negada: " + uidLido + "\"}");
                         delay(1500);
                     }
@@ -114,7 +119,11 @@ void loop() {
                 menuIniciado = true;
             }
 
-            Tela.atualizar("AJUSTAR ALVO", String(alvoVol, 0) + " %");
+            {
+                String linhaAlvo = "ALVO: " + String(alvoVol, 0) + " L";
+                while(linhaAlvo.length() < 16) linhaAlvo += " ";
+                Tela.atualizar("  AJUSTAR ALVO  ", linhaAlvo);
+            }
             
             if (btn == MAIS)  alvoVol += 5.0;
             if (btn == MENOS) alvoVol -= 5.0;
@@ -123,15 +132,26 @@ void loop() {
             if (btn == CONFIRMA) { 
                 ControleNivel.setarAlvo(alvoVol);
                 estadoAtual = EXECUTANDO;
+                Tela.limpar();
             }
             break;
 
         case EXECUTANDO:
             ControleNivel.atualizar(volAtual);
-            Tela.atualizar("ALVO: " + String(alvoVol, 0) + "%", "ATU : " + String(volAtual, 1) + "%");
+            
+            {
+                // CORREÇÃO DO BUG 3: Lê o alvo real da API (ControleNivel) em vez da variável local
+                float alvoReal = ControleNivel.getAlvo();
+                
+                String l1 = "ALVO: " + String(alvoReal, 0) + " L";
+                String l2 = "ATU : " + String(volAtual, 1) + " L";
+                
+                while(l1.length() < 16) l1 += " ";
+                while(l2.length() < 16) l2 += " ";
+                
+                Tela.atualizar(l1, l2);
+            }
 
-            // Sai se terminar o trabalho ou se houver cancelamento manual (Confirma)
-            // Também permite que comandos remotos (via monitorar) mudem o estado
             if (!ControleNivel.estaTrabalhando() || btn == CONFIRMA) {
                 ControleNivel.parar();
                 estadoAtual = ESPERANDO_RFID; 
@@ -159,5 +179,5 @@ void loop() {
         analogWrite(PIN_LED_B, 100);
     }
 
-    delay(10); // Essencial para o Watchdog do FreeRTOS
+    delay(10); 
 }

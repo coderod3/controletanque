@@ -1,55 +1,66 @@
 import { create } from 'zustand';
 
-export const useTankStore = create((set) => ({
+export const useTankStore = create((set, get) => ({
   // ==========================================
-  // 1. ESTADO GLOBAL (VARIÁVEIS)
+  // ESTADO GLOBAL
   // ==========================================
-  
-  // Status da Conexão MQTT
-  connectionStatus: 'offline', // 'connected' | 'reconnecting' | 'offline'
-  
-  // Dados Vitais do Tanque (Digital Twin)
-  volume: null, 
-  operationStatus: 'desconhecido', 
+  capacidadeMaxima: 100.0,
+
+  mqttOk: false,           // Dashboard conectado ao broker
+  boardOnline: false,      // Placa está viva (via LWT ou telemetria)
+
+  volume: 0.0,
+  targetVolume: 0.0,
+  operationStatus: 'idle', // idle | filling | draining | error | emergency | ocupado
+
+  isSending: false,        // Bloqueio de UI durante comando
   lastUpdate: null,
 
-  // Controle de Bloqueio de UI (Anti-Spam / UX)
-  isSending: false,
-  commandFeedback: '', 
-
-  // Histórico de Logs em Tempo Real
   logs: [],
 
   // ==========================================
-  // 2. AÇÕES (MÉTODOS DE ATUALIZAÇÃO)
+  // ACTIONS
   // ==========================================
+  setMqttOk: (status) => set({ mqttOk: status }),
+  setBoardOnline: (status) => set({ boardOnline: status }),
 
-  setConnectionStatus: (status) => set({ connectionStatus: status }),
-  
-  setTelemetry: (vol, status) => set((state) => ({
-    volume: vol,
-    operationStatus: status,
-    lastUpdate: Date.now(),
-    // MÁGICA DE UX: Se chegou telemetria, destrava os botões!
-    isSending: false, 
-    commandFeedback: state.isSending ? 'Ação confirmada pela placa!' : state.commandFeedback
-  })),
+setTelemetry: (vol, status) => set((state) => ({
+  volume: Number(vol) || 0,
+  operationStatus: typeof status === 'string' ? status.toLowerCase() : 'unknown',
+  lastUpdate: Date.now(),
+  isSending: false,
+})),
 
-  setCommandSending: (isSending, msg) => set({ 
-    isSending, 
-    commandFeedback: msg 
+
+  setTargetVolume: (target) => set({ targetVolume: Number(target) || 0 }),
+
+  setCommandSending: (isSending) => set({ isSending }),
+
+  setConnectionStatus: (status) => set({ 
+    mqttOk: status === 'connected' || status === 'reconnecting'
   }),
 
   addLog: (logObj) => set((state) => {
-    // Garante formato consistente: { time: timestamp, msg: string, tipo: string }
+    const timeString = new Date().toTimeString().slice(0, 8);
+    
     const newLog = {
-      time: logObj.time || Date.now(),
-      msg: logObj.msg || 'Log sem mensagem',
-      tipo: logObj.tipo || 'info'
+      id: Date.now(),
+      time: timeString,
+      msg: logObj.msg || logObj.message || 'Sem mensagem',
+      tipo: logObj.tipo || 'info',
+      fonte: logObj.fonte || 'SISTEMA'
     };
 
-    // Adiciona no topo (unshift lógico) e mantém apenas os últimos 50
-    const novosLogs = [newLog, ...state.logs].slice(0, 50);
-    return { logs: novosLogs };
+    return { 
+      logs: [newLog, ...state.logs].slice(0, 50) 
+    };
+  }),
+
+  reset: () => set({
+    volume: 0,
+    targetVolume: 0,
+    operationStatus: 'idle',
+    isSending: false,
+    logs: []
   })
 }));

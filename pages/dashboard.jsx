@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useTankStore } from "../store/useTankStore";
+import { sendCommand } from "../lib/mqttService";
 
 /* ── Tank 3D SVG (unchanged from v1) ── */
 const TANK_H   = 240;
@@ -8,7 +10,7 @@ const CX = 115;
 const RX = 82;
 const RY = 22;
 
-function Tank3D({ level, state }) {
+function Tank3D({ level, state, isOnline }) {
   const waterY  = Math.max(TANK_TOP, TANK_BOT - (level / 100) * TANK_H);
   const waterH  = TANK_BOT - waterY;
   const isActive = state !== "idle";
@@ -17,7 +19,8 @@ function Tank3D({ level, state }) {
   const wSurface= state === "draining" ? "#fed7aa" : "#bfdbfe";
 
   return (
-    <svg viewBox="0 0 260 370" xmlns="http://www.w3.org/2000/svg" className="w-full max-w-[280px]">
+    <svg viewBox="0 0 260 370" xmlns="http://www.w3.org/2000/svg" className="w-full max-w-[280px]"
+      className={`w-full max-w-[280px] transition-all duration-500 ${!isOnline ? "grayscale opacity-50" : ""}`}>
       <defs>
         <linearGradient id="bodyG" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%"   stopColor="#334155" />
@@ -160,9 +163,9 @@ function Tank3D({ level, state }) {
 }
 
 /* ── helpers ── */
-const LOG_DOT = { success: "bg-emerald-500", info: "bg-blue-500", warning: "bg-amber-400", error: "bg-red-500" };
+const LOG_DOT = { success: "bg-emerald-500", info: "bg-blue-500", warning: "bg-amber-400", error: "bg-red-500", comando: "bg-purple-500" };
 const BOARD_STATE_META = {
-  idle:     { label: "Aguardando",   cls: "text-slate-600 bg-slate-100 border-slate-200" },
+  idle:     { label: "Ocioso",   cls: "text-slate-600 bg-slate-100 border-slate-200" },
   filling:  { label: "Enchendo...",  cls: "text-blue-700 bg-blue-50 border-blue-200" },
   draining: { label: "Esvaziando...",cls: "text-orange-700 bg-orange-50 border-orange-200" },
   error:    { label: "Erro",         cls: "text-red-700 bg-red-50 border-red-200" },
@@ -188,52 +191,29 @@ function SpinIcon({ cls = "w-4 h-4" }) {
    DASHBOARD
 ══════════════════════════════════════════════════════════ */
 export default function Dashboard() {
-  const [tankLevel,   setTankLevel]   = useState(67);
-  const [boardOnline, setBoardOnline] = useState(true);
-  const [mqttOk,      setMqttOk]      = useState(true);
-  const [boardState,  setBoardState]  = useState("idle");
+  // Estados Locais (Inputs e Interface)
   const [volume,      setVolume]      = useState(1.0);
   const [operation,   setOperation]   = useState("fill"); // "fill" | "drain"
   const [sidebar,     setSidebar]     = useState(true);
-  const [logs,        setLogs]        = useState([
-    { id: 1, time: "14:32:01", type: "success", msg: "Comando ENCHER recebido pela placa — Volume: 1.5 L" },
-    { id: 2, time: "14:31:58", type: "info",    msg: "Placa ESP32 conectada ao broker MQTT (broker.hivemq.com)" },
-    { id: 3, time: "14:30:12", type: "warning", msg: "Volume solicitado acima da cota do operador NEX-012. Comando rejeitado." },
-    { id: 4, time: "14:29:45", type: "success", msg: "Operação ESVAZIAR concluída com sucesso — Volume: 0.8 L" },
-    { id: 5, time: "14:28:00", type: "info",    msg: "Sessão iniciada — Operador: João Silva (NEX-012) • Setor: Produção" },
-  ]);
 
-  const addLog = (type, msg) => {
-    const time = new Date().toTimeString().slice(0, 8);
-    setLogs((p) => [{ id: Date.now(), time, type, msg }, ...p].slice(0, 20));
-  };
+  // Estados Globais (Zustand: Conectados ao HiveMQ e ESP32)
+  const mqttOk           = useTankStore((state) => state.mqttOk);
+  const boardOnline      = useTankStore((state) => state.boardOnline);
+  const tankLevelLiters  = useTankStore((state) => state.volume);
+  const boardState       = useTankStore((state) => state.operationStatus);
+  const isSending        = useTankStore((state) => state.isSending);
+  const logs             = useTankStore((state) => state.logs);
+  const capacidadeMaxima = useTankStore((state) => state.capacidadeMaxima);
 
-  const busy = boardState !== "idle";
+  // Cálculos Derivados (Físicos)
+  const busy = boardState !== "idle" || isSending;
+  // Transforma Litros Absolutos em Porcentagem (0-100) para barras e SVG
+  const porcentagem = Math.min(100, Math.max(0, (tankLevelLiters / capacidadeMaxima) * 100)).toFixed(0);
 
+  // Lógica Única de Envio de Comando para a Placa
   const handleSend = () => {
-    if (!boardOnline) { addLog("error", "Placa offline — comando não enviado."); return; }
-    if (!mqttOk)      { addLog("error", "Broker MQTT desconectado — comando não enviado."); return; }
-    if (busy)         { addLog("warning", "Placa ocupada. Aguarde o término da operação atual."); return; }
-
-    if (operation === "fill") {
-      if (tankLevel >= 98) { addLog("warning", "Tanque já está cheio. Comando ENCHER ignorado."); return; }
-      setBoardState("filling");
-      addLog("info", `↑ Comando ENCHER enviado via MQTT — Volume: ${volume.toFixed(1)} L`);
-      setTimeout(() => {
-        addLog("success", "✓ Placa ACK: comando aceito. Iniciando enchimento...");
-        setTankLevel((p) => Math.min(100, Math.round(p + volume * 9)));
-      }, 1300);
-      setTimeout(() => { setBoardState("idle"); addLog("success", "✓ Operação ENCHER concluída."); }, 3200);
-    } else {
-      if (tankLevel <= 2) { addLog("warning", "Tanque já está vazio. Comando ESVAZIAR ignorado."); return; }
-      setBoardState("draining");
-      addLog("info", `↓ Comando ESVAZIAR enviado via MQTT — Volume: ${volume.toFixed(1)} L`);
-      setTimeout(() => {
-        addLog("success", "✓ Placa ACK: comando aceito. Iniciando esvaziamento...");
-        setTankLevel((p) => Math.max(0, Math.round(p - volume * 9)));
-      }, 1300);
-      setTimeout(() => { setBoardState("idle"); addLog("success", "✓ Operação ESVAZIAR concluída."); }, 3200);
-    }
+    const acao = operation === "fill" ? "ENCHER" : "ESVAZIAR";
+    sendCommand(acao, volume);
   };
 
   return (
@@ -358,12 +338,6 @@ export default function Dashboard() {
                   {boardOnline ? "Online" : "Offline"}
                 </p>
                 <p className="text-[10px] text-slate-400 font-mono mb-2.5">ESP32-S3 · 192.168.1.45</p>
-                <button onClick={() => {
-                  const next = !boardOnline; setBoardOnline(next);
-                  addLog(next ? "success" : "error", next ? "✓ Placa ESP32 reconectada." : "✗ Placa ESP32 desconectada.");
-                }} className="text-[10px] font-medium text-slate-400 hover:text-slate-600 border border-slate-200 hover:border-slate-300 px-2 py-0.5 rounded transition-colors">
-                  Simular ↺
-                </button>
               </div>
 
               {/* MQTT */}
@@ -376,12 +350,6 @@ export default function Dashboard() {
                   {mqttOk ? "Conectado" : "Desconect."}
                 </p>
                 <p className="text-[10px] text-slate-400 font-mono mb-2.5 truncate">broker.hivemq.com :1883</p>
-                <button onClick={() => {
-                  const next = !mqttOk; setMqttOk(next);
-                  addLog(next ? "success" : "warning", next ? "✓ Broker MQTT reconectado." : "⚠ Conexão MQTT perdida.");
-                }} className="text-[10px] font-medium text-slate-400 hover:text-slate-600 border border-slate-200 hover:border-slate-300 px-2 py-0.5 rounded transition-colors">
-                  Simular ↺
-                </button>
               </div>
 
               {/* Board state */}
@@ -393,9 +361,14 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  {busy && <SpinIcon cls="w-3.5 h-3.5 text-blue-500" />}
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${BOARD_STATE_META[boardState].cls}`}>
-                    {BOARD_STATE_META[boardState].label}
+                  {boardOnline && busy && <SpinIcon cls="w-3.5 h-3.5 text-blue-500" />}
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md border 
+                    ${!boardOnline 
+                      ? "text-slate-400 bg-slate-50 border-slate-200" 
+                      : (BOARD_STATE_META[boardState]?.cls || BOARD_STATE_META['idle'].cls)}`}>
+                    {!boardOnline 
+                      ? "Desconectado" 
+                      : (BOARD_STATE_META[boardState]?.label || "Aguardando")}
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400">
@@ -404,18 +377,20 @@ export default function Dashboard() {
               </div>
 
               {/* Level */}
+              {/* Nível do Tanque */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                 <div className="flex justify-between items-center mb-2.5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Nível do Tanque</span>
                 </div>
-                <p className="text-2xl font-bold text-blue-700 font-mono mb-1.5">{tankLevel}%</p>
+                <p className={`text-2xl font-bold font-mono mb-1.5 ${boardOnline ? "text-blue-700" : "text-slate-300"}`}>
+                  {boardOnline ? `${porcentagem}%` : "---"}
+                </p>
                 <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
-                  <div className={`h-full rounded-full transition-all duration-700 ${tankLevel > 80 ? "bg-blue-600" : tankLevel > 30 ? "bg-blue-500" : "bg-amber-500"}`}
-                    style={{ width: `${tankLevel}%` }} />
+                  <div className={`h-full rounded-full transition-all duration-700 ${!boardOnline ? "bg-slate-200" : porcentagem > 80 ? "bg-blue-600" : porcentagem > 30 ? "bg-blue-500" : "bg-amber-500"}`}
+                      style={{ width: `${boardOnline ? porcentagem : 0}%` }} />
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  {(tankLevel * 0.1).toFixed(1)} L / 10.0 L
-                  {tankLevel < 20 && <span className="ml-1 text-amber-500 font-semibold">⚠ Baixo</span>}
+                  {boardOnline ? `${tankLevelLiters.toFixed(1)} L / ${capacidadeMaxima.toFixed(1)} L` : "Sem conexão"}
                 </p>
               </div>
             </div>
@@ -431,34 +406,41 @@ export default function Dashboard() {
                     <p className="text-[11px] text-slate-400 mt-0.5">Representação em tempo real do nível de fluido</p>
                   </div>
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold shrink-0
-                    ${boardState === "filling"  ? "bg-blue-50 text-blue-700 border-blue-200" :
-                      boardState === "draining" ? "bg-orange-50 text-orange-700 border-orange-200" :
-                      "bg-slate-50 text-slate-500 border-slate-200"}`}>
-                    {busy && <SpinIcon cls="w-3 h-3" />}
-                    {boardState === "filling" ? "Enchendo" : boardState === "draining" ? "Esvaziando" : "Ocioso"}
+                    ${!boardOnline 
+                      ? "bg-slate-50 text-slate-400 border-slate-200"
+                      : boardState === "filling"  ? "bg-blue-50 text-blue-700 border-blue-200" 
+                      : boardState === "draining" ? "bg-orange-50 text-orange-700 border-orange-200" 
+                      : "bg-slate-50 text-slate-500 border-slate-200"}`}>
+                    
+                    {boardOnline && busy && <SpinIcon cls="w-3 h-3" />}
+                    {!boardOnline 
+                      ? "Desconectado" 
+                      : boardState === "filling" ? "Enchendo" 
+                      : boardState === "draining" ? "Esvaziando" 
+                      : "Ocioso"}
                   </div>
                 </div>
 
                 <div className="flex justify-center items-center py-6 bg-white">
-                  <Tank3D level={tankLevel} state={boardState} />
+                  <Tank3D level={boardOnline ? porcentagem : 0} state={boardOnline ? boardState : "idle"} isOnline={boardOnline} />
                 </div>
 
                 {/* Level bar footer */}
                 <div className="px-5 py-3.5 border-t border-slate-100">
                   <div className="flex justify-between text-xs mb-1.5">
                     <span className="text-slate-500">Nível atual</span>
-                    <span className="font-bold text-slate-700">
-                      {tankLevel}% · {(tankLevel * 0.1).toFixed(1)} L / 10.0 L
+                    <span className={`font-bold ${boardOnline ? "text-slate-700" : "text-slate-300"}`}>
+                      {boardOnline ? `${porcentagem}% · ${tankLevelLiters.toFixed(1)} L / ${capacidadeMaxima.toFixed(1)} L` : "--- · Sem conexão"}
                     </span>
                   </div>
                   <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-700 ${tankLevel > 80 ? "bg-blue-600" : tankLevel > 30 ? "bg-blue-500" : "bg-amber-500"}`}
-                      style={{ width: `${tankLevel}%` }} />
+                    <div className={`h-full rounded-full transition-all duration-700 ${!boardOnline ? "bg-slate-200" : porcentagem > 80 ? "bg-blue-600" : porcentagem > 30 ? "bg-blue-500" : "bg-amber-500"}`}
+                      style={{ width: `${boardOnline ? porcentagem : 0}%` }} />
                   </div>
                   <div className="flex justify-between text-[10px] text-slate-400 mt-1.5">
                     <span>0%</span>
-                    {tankLevel < 20 && <span className="text-amber-500 font-bold">⚠ Nível crítico</span>}
-                    {tankLevel > 90 && <span className="text-blue-500 font-bold">Tanque quase cheio</span>}
+                    {boardOnline && porcentagem < 20 && <span className="text-amber-500 font-bold">⚠ Nível crítico</span>}
+                    {boardOnline && porcentagem > 90 && <span className="text-blue-500 font-bold">Tanque quase cheio</span>}
                     <span>100%</span>
                   </div>
                 </div>
@@ -494,67 +476,90 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Volume slider */}
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Volume (Litros)</span>
-                      <span className="text-[10px] text-slate-400 font-mono">máx 2.0 L</span>
-                    </div>
-                    <div className="relative mb-2">
-                      <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 text-right font-mono text-sm font-bold text-slate-800 pr-8">
-                        {volume.toFixed(1)}
-                      </div>
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">L</span>
-                    </div>
-                    <input type="range" min="0.1" max="2.0" step="0.1"
-                      value={volume}
-                      onChange={(e) => setVolume(parseFloat(e.target.value))}
-                      className={`w-full cursor-pointer ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"}`} />
-                    <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                      <span>0.1 L</span><span>2.0 L</span>
-                    </div>
-                  </div>
+                  {/* Escopo de Matemática Dinâmica (Calcula limites em tempo real) */}
+                  {(() => {
+                    const limiteEncher = Math.max(0, capacidadeMaxima - tankLevelLiters);
+                    const limiteEsvaziar = Math.max(0, tankLevelLiters);
+                    const limiteAtual = operation === "fill" ? limiteEncher : limiteEsvaziar;
+                    
+                    // Impede que o slider quebre caso o limite atual seja 0
+                    const maxSlider = limiteAtual < 0.1 ? 0.1 : limiteAtual; 
+                    
+                    // Garante que se o usuário trocar a aba com um valor alto salvo, ele seja cortado no limite
+                    const volumeSeguro = Math.min(volume, maxSlider);
+                    const isOpDisabled = limiteAtual < 0.1;
 
-                  {/* Quota info */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col gap-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Cota Encher</span>
-                      <span className="font-bold text-blue-700 font-mono">2.0 L</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Cota Esvaziar</span>
-                      <span className="font-bold text-orange-600 font-mono">2.0 L</span>
-                    </div>
-                    <div className="flex justify-between text-xs border-t border-slate-200 pt-2 mt-0.5">
-                      <span className="text-slate-500">Nível atual</span>
-                      <span className="font-bold text-slate-800 font-mono">{tankLevel}%</span>
-                    </div>
-                  </div>
-
-                  {/* Send button */}
-                  <button onClick={handleSend}
-                    disabled={busy || !boardOnline || !mqttOk}
-                    className={`w-full py-3 font-bold text-sm rounded-xl text-white transition-all
-                      flex items-center justify-center gap-2
-                      disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none
-                      ${operation === "fill"
-                        ? "bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-sm shadow-blue-600/20"
-                        : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700 shadow-sm shadow-orange-500/20"}`}>
-                    {busy ? (
-                      <><SpinIcon />{boardState === "filling" ? "Enchendo..." : "Esvaziando..."}</>
-                    ) : (
+                    return (
                       <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                        </svg>
-                        Enviar Comando
+                        {/* Volume slider */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Volume (Litros)</span>
+                            <span className="text-[10px] text-slate-400 font-mono">máx {limiteAtual.toFixed(1)} L</span>
+                          </div>
+                          <div className="relative mb-2">
+                            <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 text-right font-mono text-sm font-bold text-slate-800 pr-8">
+                              {volumeSeguro.toFixed(1)}
+                            </div>
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">L</span>
+                          </div>
+                          <input type="range" min="0.1" max={maxSlider} step="0.1"
+                            value={volumeSeguro}
+                            onChange={(e) => setVolume(parseFloat(e.target.value))}
+                            disabled={isOpDisabled}
+                            className={`w-full ${isOpDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"}`} />
+                          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <span>0.1 L</span><span>{maxSlider.toFixed(1)} L</span>
+                          </div>
+                        </div>
+
+                        {/* Quota info dinâmica */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col gap-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Disponível Encher</span>
+                            <span className="font-bold text-blue-700 font-mono">{limiteEncher.toFixed(1)} L</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Disponível Esvaziar</span>
+                            <span className="font-bold text-orange-600 font-mono">{limiteEsvaziar.toFixed(1)} L</span>
+                          </div>
+                          <div className="flex justify-between text-xs border-t border-slate-200 pt-2 mt-0.5">
+                            <span className="text-slate-500">Nível atual</span>
+                            <span className="font-bold text-slate-800 font-mono">{tankLevelLiters.toFixed(1)} L</span>
+                          </div>
+                        </div>
+
+                        {/* Send button (Intercepta e valida antes de enviar) */}
+                        <button 
+                          onClick={() => {
+                            const acao = operation === "fill" ? "ENCHER" : "ESVAZIAR";
+                            sendCommand(acao, volumeSeguro);
+                          }}
+                          disabled={busy || !boardOnline || !mqttOk || isOpDisabled}
+                          className={`w-full py-3 font-bold text-sm rounded-xl text-white transition-all mt-4
+                            flex items-center justify-center gap-2
+                            disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none
+                            ${operation === "fill"
+                              ? "bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-sm shadow-blue-600/20"
+                              : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700 shadow-sm shadow-orange-500/20"}`}>
+                          {busy ? (
+                            <><SpinIcon />{boardState === "filling" ? "Enchendo..." : "Esvaziando..."}</>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                              </svg>
+                              {isOpDisabled ? "Limite Atingido" : "Enviar Comando"}
+                            </>
+                          )}
+                        </button>
                       </>
-                    )}
-                  </button>
+                    );
+                  })()}
 
                   {/* Ready indicator */}
-                  <p className={`text-xs font-medium flex items-center gap-1.5 justify-center
+                  <p className={`text-xs font-medium flex items-center gap-1.5 justify-center mt-2
                     ${boardOnline && mqttOk ? "text-emerald-700" : "text-red-600"}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${boardOnline && mqttOk ? "bg-emerald-500" : "bg-red-500"}`} />
                     {boardOnline && mqttOk
@@ -587,7 +592,7 @@ export default function Dashboard() {
                 {logs.map((log, idx) => (
                   <div key={log.id}
                     className={`flex items-start gap-3.5 px-5 py-3 transition-colors hover:bg-slate-50/80 ${idx === 0 ? "bg-slate-50/40" : ""}`}>
-                    <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${LOG_DOT[log.type]}`} />
+                    <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${LOG_DOT[log.tipo]}`} />
                     <p className="flex-1 text-xs text-slate-700 leading-relaxed">{log.msg}</p>
                     <span className="text-[10px] font-mono text-slate-400 shrink-0 mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded">
                       {log.time}

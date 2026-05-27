@@ -4,13 +4,18 @@
 ControleNivelAPI ControleNivel;
 
 void ControleNivelAPI::iniciar() {
-    alvoCm = 0.0f;
+    alvoLitros = 0.0f;
     ativo = false;
 }
 
-void ControleNivelAPI::setarAlvo(float centimetros) {
-    alvoCm = centimetros;
+void ControleNivelAPI::setarAlvo(float litros) {
+    alvoLitros = litros;
     ativo = true;
+}
+
+// NOVO: Retorna o alvo exato para o display LCD
+float ControleNivelAPI::getAlvo() {
+    return alvoLitros;
 }
 
 void ControleNivelAPI::parar() {
@@ -22,19 +27,19 @@ bool ControleNivelAPI::estaTrabalhando() {
     return ativo;
 }
 
-void ControleNivelAPI::atualizar(float nivelAtual) {
+void ControleNivelAPI::atualizar(float volumeAtualLitros) {
     if (!ativo) return;
 
-    float margem = 0.5f; // 1% de margem de erro
+    float margem = 0.5f; // Margem de erro de meio litro (0.5L) para evitar repique nas válvulas
 
-    if (nivelAtual < alvoCm - margem) {
-        Bombas.ligarEncher();   // Tem menos água que o alvo -> ENCHE
+    if (volumeAtualLitros < (alvoLitros - margem)) {
+        Bombas.ligarEncher();   // Falta água para chegar no alvo -> ENCHE
     } 
-    else if (nivelAtual > alvoCm + margem) {
+    else if (volumeAtualLitros > (alvoLitros + margem)) {
         Bombas.ligarEsvaziar(); // Tem mais água que o alvo -> ESVAZIA
     } 
     else {
-        Bombas.desligar();      // Chegou!
+        Bombas.desligar();      // Chegou na meta!
         ativo = false; 
     }
 }

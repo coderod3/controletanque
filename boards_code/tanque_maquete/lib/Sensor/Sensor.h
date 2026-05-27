@@ -10,9 +10,10 @@ private:
     bool estadoEsvaziando;
 public:
     void iniciar();
-    void setDirecao(bool enchendo, bool esvaziando); // Avisa o sensor do estado físico
+    void setDirecao(bool enchendo, bool esvaziando);
     float lerCm();
     float lerPorcentagem();
+    float lerLitros(); // NOVO: Retorna o volume exato no tanque
 };
 
 extern SensorAPI Sensor;

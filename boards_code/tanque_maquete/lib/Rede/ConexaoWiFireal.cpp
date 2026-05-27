@@ -3,15 +3,15 @@
 #include "Config.h"
 
 ConexaoWiFiAPI ConexaoWiFi;
-// ARQUIVO PARA TESTES
+
 void ConexaoWiFiAPI::iniciar() {
     _conectado = false;
     _ultimaTentativa = 0;
 
     WiFi.mode(WIFI_STA);
 
-#ifdef AMBIENTE_REAL
-    // Configuração de IP Estático apenas para a placa física
+    // Configuração de IP Estático conforme solicitado (.115)
+    // Ajustado para a sub-rede 192.168.1.x (comum na maioria dos roteadores)
     IPAddress local_IP(192, 168, 0, 115);
     IPAddress gateway(192, 168, 0, 1);      
     IPAddress subnet(255, 255, 255, 0);
@@ -20,9 +20,6 @@ void ConexaoWiFiAPI::iniciar() {
     if (!WiFi.config(local_IP, gateway, subnet, dns)) {
         Serial.println("[WiFi] Erro ao configurar IP Estatico!");
     }
-#endif
-    // Se AMBIENTE_REAL não estiver definido (estamos no Wokwi), 
-    // o ESP32 pula o bloco acima e usa DHCP nativamente.
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }

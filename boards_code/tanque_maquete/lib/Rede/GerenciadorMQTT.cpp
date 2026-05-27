@@ -9,10 +9,14 @@ static PubSubClient mqttClient(espClient);
 GerenciadorMQTTAPI GerenciadorMQTT;
 
 void GerenciadorMQTTAPI::iniciar() {
-    // Configuração de segurança para HiveMQ Cloud
     espClient.setInsecure(); 
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(this->_callback);
+    
+    // NOVO: Força o HiveMQ a ser impaciente. 
+    // Se a placa sumir por 5 segundos, ele dispara o LWT.
+    mqttClient.setKeepAlive(5); 
+
     Serial.println("[MQTT] Servico inicializado.");
 }
 
@@ -28,8 +32,6 @@ void GerenciadorMQTTAPI::processar() {
 
     mqttClient.loop();
 
-    // --- LOGÍSTICA DE SAÍDA (TX) ---
-    // O MQTT retira da fila e envia para a nuvem
     MensagemSaida msg;
     if (xQueueReceive(filaTX, &msg, 0) == pdPASS) {
         mqttClient.publish(msg.topico, msg.payload);
@@ -45,12 +47,17 @@ void GerenciadorMQTTAPI::_tentarReconectar() {
 
     Serial.print("[MQTT] Conectando ao Broker... ");
     
-    // Configuração de Last Will (LWT) inspirada no seu código antigo
-    const char* lwtTopic = TOPIC_TELEMETRIA;
+    // CORREÇÃO: Tópico de Status exclusivo para o Testamento (LWT)
+    const char* lwtTopic = "tanque/status";
     const char* lwtMsg = "{\"status\": \"OFFLINE\"}";
 
+    // Conecta pedindo ao broker para reter a mensagem de morte
     if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS, lwtTopic, 0, true, lwtMsg)) {
         Serial.println("OK!");
+        
+        // Assim que conecta, subscreve a mensagem retida mandando um ONLINE
+        mqttClient.publish("tanque/status", "{\"status\": \"ONLINE\"}", true); 
+        
         mqttClient.subscribe(TOPIC_COMANDO);
     } else {
         Serial.print("Falha, rc=");
@@ -58,13 +65,10 @@ void GerenciadorMQTTAPI::_tentarReconectar() {
     }
 }
 
-// --- LOGÍSTICA DE ENTRADA (RX) ---
-// Quando chega algo do site, o MQTT empacota e joga na fila para o Core 1
 void GerenciadorMQTTAPI::_callback(char* topic, byte* payload, unsigned int length) {
     ComandoEntrada cmd;
     memset(cmd.payload, 0, sizeof(cmd.payload));
 
-    // Copia segura dos dados brutos
     unsigned int len = (length < sizeof(cmd.payload) - 1) ? length : sizeof(cmd.payload) - 1;
     memcpy(cmd.payload, payload, len);
 

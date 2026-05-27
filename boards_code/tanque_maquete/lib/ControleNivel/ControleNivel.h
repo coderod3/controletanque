@@ -4,14 +4,14 @@
 
 class ControleNivelAPI {
 private:
-    float alvoCm;
-    float alvoVol;
+    float alvoLitros;
     bool ativo;
 public:
     void iniciar();
-    void setarAlvo(float centimetros);
-    void parar(); // Corte de emergência
-    void atualizar(float distanciaAtual); // Chamado a cada ciclo pelo main
+    void setarAlvo(float litros);
+    float getAlvo(); // NOVO: Permite consultar o alvo atual
+    void parar(); 
+    void atualizar(float volumeAtualLitros); 
     bool estaTrabalhando();
 };
 
