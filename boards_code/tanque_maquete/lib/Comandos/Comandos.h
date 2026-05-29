@@ -8,7 +8,7 @@ class ComandosAPI {
 public:
     void iniciar();
     void monitorar(); // Verifica se há novos comandos na fila de rede
-
+    bool pendenteSync = false; // <--- ADICIONE ESTA FLAG
 private:
     void _processar(String json);
 };

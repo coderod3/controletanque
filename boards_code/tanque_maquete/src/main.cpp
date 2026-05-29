@@ -16,13 +16,14 @@
 #include "Comandos.h"  // Intérprete de mensagens MQTT
 #include "Auditoria.h" // Adicione nos includes
 
-// Estados do Sistema
-enum EstadoSistema { ESPERANDO_RFID, MENU_AJUSTE, EXECUTANDO };
+// --- NOVO ESTADO "SINCRONIZANDO" ADICIONADO ---
+enum EstadoSistema { ESPERANDO_RFID, MENU_AJUSTE, EXECUTANDO, SINCRONIZANDO };
 EstadoSistema estadoAtual = ESPERANDO_RFID;
 
 float alvoVol = 0.0;
 bool menuIniciado = false;
 unsigned long delayTelemetria = 0;
+unsigned long ts_animacao_sync = 0; // Temporizador para o delay da tela
 
 // --- VARIÁVEIS GLOBAIS DE TRACING ---
 unsigned long ts_recebido = 0;
@@ -38,7 +39,7 @@ void setup() {
     // 1. Inicializa Infraestrutura de Rede (Dispara o Core 0)
     Rede.iniciar();
     Usuarios.iniciar();
-    Auditoria.iniciar(); // <--- Adicione esta linha
+    Auditoria.iniciar(); 
     
     // 2. Inicializa Hardware e Lógica (Core 1)
     Sensor.iniciar();
@@ -64,8 +65,22 @@ void loop() {
     // ---------------------------------------------------------
     Comandos.monitorar();
 
+    // INTERCEPTADOR DE SYNC: Se comandos gravou algo na Flash
+    if (Comandos.pendenteSync) {
+        Comandos.pendenteSync = false; // Consome a notificação
+        
+        // Parada de segurança: Não altera parâmetros críticos com bombas ligadas
+        if (estadoAtual == EXECUTANDO) {
+            ControleNivel.parar(); 
+        }
+        
+        estadoAtual = SINCRONIZANDO;
+        ts_animacao_sync = millis();
+        Tela.limpar();
+    }
+
     // Intercepta comandos vindos da Web para forçar o estado de Execução
-    if (ControleNivel.estaTrabalhando() && estadoAtual != EXECUTANDO) {
+    if (ControleNivel.estaTrabalhando() && estadoAtual != EXECUTANDO && estadoAtual != SINCRONIZANDO) {
         
         // Se a origem estiver vazia, significa que o comando veio do MQTT (Web)
         if (ctx_origem == "") {
@@ -77,7 +92,6 @@ void loop() {
         estadoAtual = EXECUTANDO;
         menuIniciado = false; 
         
-        // Registra o início real da física
         ts_inicio = millis();
         vol_inicial_tarefa = Sensor.lerLitros();
     }
@@ -92,11 +106,13 @@ void loop() {
     // Envia telemetria para o site a cada 2 segundos
     if (millis() - delayTelemetria > 2000) {
         
-        // CORREÇÃO DO BUG 1: Dicionário traduzido para o React ("filling", "draining", "idle")
         String statusStr = "idle";
         if (estadoAtual == EXECUTANDO) {
             if (bombaEnchendo) statusStr = "filling";
             else if (bombaEsvaziando) statusStr = "draining";
+        } 
+        else if (estadoAtual == SINCRONIZANDO) {
+            statusStr = "ocupado"; // Diz pro site que estamos regravando memória
         }
         
         String json = "{\"nivel\":" + String(volAtual, 1) + ",\"estado\":\"" + statusStr + "\"}";
@@ -109,6 +125,25 @@ void loop() {
     // ---------------------------------------------------------
     switch (estadoAtual) {
         
+        case SINCRONIZANDO:
+            // LED Ciano (Azul + Verde) indicando operação de Memória
+            analogWrite(PIN_LED_R, 0);
+            analogWrite(PIN_LED_G, 255);
+            analogWrite(PIN_LED_B, 255);
+
+            // Temporizador da Animação (Mostra na tela por 3 segundos no total)
+            if (millis() - ts_animacao_sync < 1500) {
+                Tela.atualizar(" GRAVANDO NVS.. ", " AGUARDE O SYNC ");
+            } 
+            else if (millis() - ts_animacao_sync < 3000) {
+                Tela.atualizar("   PARAMETROS   ", " ATUALIZADOS OK ");
+            } 
+            else {
+                Tela.limpar();
+                estadoAtual = ESPERANDO_RFID; // Retorna ao repouso
+            }
+            break;
+
         case ESPERANDO_RFID:
             Tela.atualizar("ACESSO RESTRITO ", " PASSE O CARTAO ");
             
@@ -117,12 +152,10 @@ void loop() {
                 if (uidLido != "") {
                     String nomeUser;
                     if (Usuarios.autenticar(uidLido, nomeUser)) {
-                        // para log
                         ctx_origem = "LOCAL_RFID";
                         ctx_usuario = nomeUser;
-                        ts_recebido = millis(); // Carimba a hora que o cartão passou
+                        ts_recebido = millis(); 
 
-                        // resto
                         String saudacao = "OLA, " + nomeUser.substring(0, 11);
                         Tela.atualizar(saudacao, "ACESSO LIBERADO ");
                         Rede.enviar("tanque/logs", "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
@@ -167,9 +200,7 @@ void loop() {
             ControleNivel.atualizar(volAtual);
             
             {
-                // CORREÇÃO DO BUG 3: Lê o alvo real da API (ControleNivel) em vez da variável local
                 float alvoReal = ControleNivel.getAlvo();
-                
                 String l1 = "ALVO: " + String(alvoReal, 0) + " L";
                 String l2 = "ATU : " + String(volAtual, 1) + " L";
                 
@@ -202,7 +233,6 @@ void loop() {
                 
                 Auditoria.registrar(logAudit);
                 
-                // Reseta contexto
                 ctx_origem = "";
                 ctx_usuario = "";
             }
@@ -213,20 +243,23 @@ void loop() {
     // ---------------------------------------------------------
     // 2. FEEDBACK VISUAL (LED RGB PWM)
     // ---------------------------------------------------------
-    if (bombaEnchendo) {
-        analogWrite(PIN_LED_R, 0);
-        analogWrite(PIN_LED_G, 255);
-        analogWrite(PIN_LED_B, 0);
-    } 
-    else if (bombaEsvaziando) {
-        analogWrite(PIN_LED_R, 255);
-        analogWrite(PIN_LED_G, 0);
-        analogWrite(PIN_LED_B, 0);
-    } 
-    else {
-        analogWrite(PIN_LED_R, 0);
-        analogWrite(PIN_LED_G, 0);
-        analogWrite(PIN_LED_B, 100);
+    // Se estiver sincronizando, o LED Ciano já tomou conta acima
+    if (estadoAtual != SINCRONIZANDO) {
+        if (bombaEnchendo) {
+            analogWrite(PIN_LED_R, 0);
+            analogWrite(PIN_LED_G, 255);
+            analogWrite(PIN_LED_B, 0);
+        } 
+        else if (bombaEsvaziando) {
+            analogWrite(PIN_LED_R, 255);
+            analogWrite(PIN_LED_G, 0);
+            analogWrite(PIN_LED_B, 0);
+        } 
+        else {
+            analogWrite(PIN_LED_R, 0);
+            analogWrite(PIN_LED_G, 0);
+            analogWrite(PIN_LED_B, 100);
+        }
     }
 
     delay(10); 

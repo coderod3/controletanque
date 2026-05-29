@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTankStore } from "../store/useTankStore";
 import pool from "../lib/db"; 
-import { useEffect } from "react"; // Certifique-se de que useEffect está importado no topo
+import { useEffect } from "react";
 
 // --- SSR: OBTENÇÃO DE DADOS NO SERVIDOR ---
 export async function getServerSideProps() {

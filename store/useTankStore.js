@@ -17,20 +17,21 @@ export const useTankStore = create((set, get) => ({
   lastUpdate: null,
 
   logs: [],
+  deviceParams: null,      // GUARDA OS PARÂMETROS VINDOS DA MEMÓRIA DA PLACA
 
   // ==========================================
   // ACTIONS
   // ==========================================
   setMqttOk: (status) => set({ mqttOk: status }),
   setBoardOnline: (status) => set({ boardOnline: status }),
+  setDeviceParams: (params) => set({ deviceParams: params }), // NOVA AÇÃO
 
-setTelemetry: (vol, status) => set((state) => ({
-  volume: Number(vol) || 0,
-  operationStatus: typeof status === 'string' ? status.toLowerCase() : 'unknown',
-  lastUpdate: Date.now(),
-  isSending: false,
-})),
-
+  setTelemetry: (vol, status) => set((state) => ({
+    volume: Number(vol) || 0,
+    operationStatus: typeof status === 'string' ? status.toLowerCase() : 'unknown',
+    lastUpdate: Date.now(),
+    isSending: false,
+  })),
 
   setTargetVolume: (target) => set({ targetVolume: Number(target) || 0 }),
 
@@ -61,6 +62,7 @@ setTelemetry: (vol, status) => set((state) => ({
     targetVolume: 0,
     operationStatus: 'idle',
     isSending: false,
-    logs: []
+    logs: [],
+    deviceParams: null
   })
 }));

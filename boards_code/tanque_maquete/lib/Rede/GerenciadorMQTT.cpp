@@ -59,6 +59,10 @@ void GerenciadorMQTTAPI::_tentarReconectar() {
         mqttClient.publish("tanque/status", "{\"status\": \"ONLINE\"}", true); 
         
         mqttClient.subscribe(TOPIC_COMANDO);
+        // Força a placa a injetar um JSON virtual na fila dela pedindo o GET_SYNC para se auto-publicar
+        ComandoEntrada cmdSync;
+        strcpy(cmdSync.payload, "{\"comando\": \"GET_SYNC\"}");
+        xQueueSend(filaRX, &cmdSync, 0);
     } else {
         Serial.print("Falha, rc=");
         Serial.println(mqttClient.state());
