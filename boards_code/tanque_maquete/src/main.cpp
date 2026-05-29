@@ -14,6 +14,7 @@
 #include "Rede.h"      // Orquestrador do Core 0
 #include "Usuarios.h"  // Banco de dados local na Flash
 #include "Comandos.h"  // Intérprete de mensagens MQTT
+#include "Auditoria.h" // Adicione nos includes
 
 // Estados do Sistema
 enum EstadoSistema { ESPERANDO_RFID, MENU_AJUSTE, EXECUTANDO };
@@ -23,6 +24,13 @@ float alvoVol = 0.0;
 bool menuIniciado = false;
 unsigned long delayTelemetria = 0;
 
+// --- VARIÁVEIS GLOBAIS DE TRACING ---
+unsigned long ts_recebido = 0;
+unsigned long ts_inicio = 0;
+float vol_inicial_tarefa = 0.0;
+String ctx_origem = "";
+String ctx_usuario = "";
+
 void setup() {
     Serial.begin(115200);
     Serial.println("\n--- NEXUS OS | INICIALIZANDO ---");
@@ -30,6 +38,7 @@ void setup() {
     // 1. Inicializa Infraestrutura de Rede (Dispara o Core 0)
     Rede.iniciar();
     Usuarios.iniciar();
+    Auditoria.iniciar(); // <--- Adicione esta linha
     
     // 2. Inicializa Hardware e Lógica (Core 1)
     Sensor.iniciar();
@@ -57,10 +66,22 @@ void loop() {
 
     // Intercepta comandos vindos da Web para forçar o estado de Execução
     if (ControleNivel.estaTrabalhando() && estadoAtual != EXECUTANDO) {
+        
+        // Se a origem estiver vazia, significa que o comando veio do MQTT (Web)
+        if (ctx_origem == "") {
+            ctx_origem = "WEB_DASHBOARD";
+            ctx_usuario = "OPERADOR_WEB"; 
+            ts_recebido = millis();
+        }
+
         estadoAtual = EXECUTANDO;
         menuIniciado = false; 
+        
+        // Registra o início real da física
+        ts_inicio = millis();
+        vol_inicial_tarefa = Sensor.lerLitros();
     }
-    
+
     bool bombaEnchendo = digitalRead(PIN_BOMBA_ENCHER);
     bool bombaEsvaziando = digitalRead(PIN_BOMBA_ESVAZ);
     Sensor.setDirecao(bombaEnchendo, bombaEsvaziando);
@@ -96,6 +117,12 @@ void loop() {
                 if (uidLido != "") {
                     String nomeUser;
                     if (Usuarios.autenticar(uidLido, nomeUser)) {
+                        // para log
+                        ctx_origem = "LOCAL_RFID";
+                        ctx_usuario = nomeUser;
+                        ts_recebido = millis(); // Carimba a hora que o cartão passou
+
+                        // resto
                         String saudacao = "OLA, " + nomeUser.substring(0, 11);
                         Tela.atualizar(saudacao, "ACESSO LIBERADO ");
                         Rede.enviar("tanque/logs", "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
@@ -156,7 +183,30 @@ void loop() {
                 ControleNivel.parar();
                 estadoAtual = ESPERANDO_RFID; 
                 Tela.limpar();
+                
+                LogOperacao logAudit;
+                float alvoReq = ControleNivel.getAlvo();
+                
+                strncpy(logAudit.tipo_operacao, (alvoReq > vol_inicial_tarefa) ? "ENCHER" : "ESVAZIAR", sizeof(logAudit.tipo_operacao) - 1);
+                strncpy(logAudit.usuario_id, ctx_usuario.c_str(), sizeof(logAudit.usuario_id) - 1);
+                strncpy(logAudit.origem_comando, ctx_origem.c_str(), sizeof(logAudit.origem_comando) - 1);
+                strncpy(logAudit.status, (btn == CONFIRMA) ? "CANCELADO" : "SUCESSO", sizeof(logAudit.status) - 1);
+                
+                logAudit.volume_alvo = alvoReq;
+                logAudit.volume_inicial = vol_inicial_tarefa;
+                logAudit.volume_final = Sensor.lerLitros();
+                
+                logAudit.recebido_ms = ts_recebido;
+                logAudit.inicio_ms = ts_inicio;
+                logAudit.fim_ms = millis();
+                
+                Auditoria.registrar(logAudit);
+                
+                // Reseta contexto
+                ctx_origem = "";
+                ctx_usuario = "";
             }
+
             break;
     }
 

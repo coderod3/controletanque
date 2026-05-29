@@ -68,4 +68,11 @@
 // Comente esta linha para mudar para o EMULADOR
 // #define AMBIENTE_REAL 
 
+// =============================================================================
+// AUDITORIA E REST API
+// =============================================================================
+#define NTP_SERVER         "pool.ntp.org"
+#define API_AUDITORIA_URL  "http://controletanque.vercel.app/api/auditoria" // Mude para seu domínio depois
+
+
 #endif // CONFIG_H
