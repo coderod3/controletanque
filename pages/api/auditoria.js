@@ -1,4 +1,4 @@
-import pool from '../../../lib/db'; // Ajuste os '../' se o ficheiro estiver em pages/api/auditoria.js
+import pool from '../../lib/db'; // Ajuste os '../' se o ficheiro estiver em pages/api/auditoria.js
 
 export default async function handler(req, res) {
   // Apenas aceitamos métodos POST (O ESP32 envia HTTP POST)
