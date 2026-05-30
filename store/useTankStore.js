@@ -5,26 +5,30 @@ export const useTankStore = create((set, get) => ({
   // ESTADO GLOBAL
   // ==========================================
   capacidadeMaxima: 100.0,
+  
+  // NOVO: 'visualizacao' | 'operador' | 'gestor'
+  userRole: 'gestor',
 
-  mqttOk: false,           // Dashboard conectado ao broker
-  boardOnline: false,      // Placa está viva (via LWT ou telemetria)
+  mqttOk: false,           
+  boardOnline: false,      
 
   volume: 0.0,
   targetVolume: 0.0,
-  operationStatus: 'idle', // idle | filling | draining | error | emergency | ocupado
+  operationStatus: 'idle', 
 
-  isSending: false,        // Bloqueio de UI durante comando
+  isSending: false,        
   lastUpdate: null,
 
   logs: [],
-  deviceParams: null,      // GUARDA OS PARÂMETROS VINDOS DA MEMÓRIA DA PLACA
 
   // ==========================================
   // ACTIONS
   // ==========================================
+  // NOVO SETTER DE CARGO
+  setUserRole: (role) => set({ userRole: role }),
+
   setMqttOk: (status) => set({ mqttOk: status }),
   setBoardOnline: (status) => set({ boardOnline: status }),
-  setDeviceParams: (params) => set({ deviceParams: params }), // NOVA AÇÃO
 
   setTelemetry: (vol, status) => set((state) => ({
     volume: Number(vol) || 0,
@@ -62,7 +66,6 @@ export const useTankStore = create((set, get) => ({
     targetVolume: 0,
     operationStatus: 'idle',
     isSending: false,
-    logs: [],
-    deviceParams: null
+    logs: []
   })
 }));

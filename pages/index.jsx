@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useTankStore } from '../store/useTankStore';
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [matricula, setMatricula] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
-  // Tom de Azul de Água mantido
   const [bgColor, setBgColor] = useState('#0284c7');
 
   const handleLogin = async (e) => {
@@ -17,14 +17,29 @@ export default function Login() {
     setIsLoading(true);
     setErrorMsg('');
 
-    setTimeout(() => {
-      if (email === 'admin@nexus.com' && password === 'admin') {
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matricula, password })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Injeta o cargo validado no banco de dados para dentro do sistema
+        useTankStore.getState().setUserRole(data.role);
+        // Salva o cargo em um cookie que o servidor consegue ler
+        document.cookie = `nexus_role=${data.role}; path=/; max-age=86400; SameSite=Strict`;
         router.push('/dashboard');
       } else {
-        setErrorMsg('Credenciais inválidas ou sem permissão de acesso.');
+        const errorData = await res.json();
+        setErrorMsg(errorData.message || 'Credenciais inválidas ou sem permissão.');
         setIsLoading(false);
       }
-    }, 1500);
+    } catch (error) {
+      setErrorMsg('Erro ao conectar com o servidor.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -33,12 +48,9 @@ export default function Login() {
       style={{ backgroundColor: bgColor }}
     >
       <Head>
-        <title>Autenticação - Nexus Open-Logic</title>
+        <title>Autenticação - Nexus OS</title>
       </Head>
 
-      {/* ========================================================= */}
-      {/* SELETOR DE CORES (Canto Inferior Esquerdo)                  */}
-      {/* ========================================================= */}
       <div className="fixed bottom-6 left-6 bg-black/20 backdrop-blur-md p-3 rounded-xl border border-white/20 shadow-2xl z-50 flex items-center gap-3 hover:bg-black/30 transition-all">
         <label htmlFor="colorPicker" className="text-xs font-semibold text-white drop-shadow-md cursor-pointer">
           Tom do Fundo:
@@ -54,29 +66,19 @@ export default function Login() {
         <span className="text-xs text-white/90 font-mono uppercase bg-black/20 px-2 py-1 rounded">{bgColor}</span>
       </div>
 
-      {/* ========================================================= */}
-      {/* SPRITES AGRO-TECH (Arroz e Milho) - Forçados para BRANCO     */}
-      {/* ========================================================= */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        
-        {/* Planta de Arroz - Esquerda */}
-        {/* Usamos brightness-0 invert para forçar silhueta branca pura */}
         <img 
           src="/img/rice.png" 
           alt="" 
           className="absolute -left-10 bottom-10 h-[75vh] w-auto object-contain opacity-30 brightness-0 invert drop-shadow-[0_4px_10px_rgba(255,255,255,0.1)]"
         />
-
-        {/* Planta de Milho - Direita */}
         <img 
           src="/img/corn.png" 
           alt="" 
           className="absolute -right-16 bottom-10 h-[85vh] w-auto object-contain opacity-30 brightness-0 invert drop-shadow-[0_4px_10px_rgba(255,255,255,0.1)]"
         />
-
       </div>
 
-      {/* Faixa de Grama no Rodapé - Forçada para BRANCO Puro */}
       <div className="absolute bottom-0 left-0 w-full pointer-events-none z-0">
         <img 
           src="/img/grass-footer.png" 
@@ -85,13 +87,9 @@ export default function Login() {
         />
       </div>
 
-      {/* Luzes solares para iluminar o fundo */}
       <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-white/10 rounded-full blur-[150px] pointer-events-none z-0"></div>
       <div className="absolute bottom-0 left-1/4 w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[150px] pointer-events-none z-0"></div>
 
-      {/* ========================================================= */}
-      {/* CAIXA DE LOGIN (z-10 para ficar à frente dos elementos)     */}
-      {/* ========================================================= */}
       <div className="relative z-10 w-full max-w-md mt-[-5vh]">
         
         <div className="text-center mb-6">
@@ -121,17 +119,17 @@ export default function Login() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="email">
-                E-mail Corporativo
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="matricula">
+                Matrícula (Login)
               </label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="matricula"
+                type="text"
+                value={matricula}
+                onChange={(e) => setMatricula(e.target.value)}
                 disabled={isLoading}
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50 font-medium text-sm"
-                placeholder="operador@empresa.com"
+                placeholder="admin"
                 required
               />
             </div>

@@ -1,9 +1,8 @@
 import Head from 'next/head';
+import { initMqtt } from '../lib/mqttService'; 
 import '../styles/globals.css'; 
-import { initMqtt } from '../lib/mqttService'; // Importe a função aqui
 
-// ISSO RODA UMA ÚNICA VEZ QUANDO O CÓDIGO JS É CARREGADO NO NAVEGADOR
-// E não entra nos loops de renderização do React!
+// Executa uma única vez no carregamento inicial do navegador
 if (typeof window !== 'undefined') {
   initMqtt();
 }

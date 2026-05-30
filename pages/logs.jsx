@@ -1,48 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTankStore } from "../store/useTankStore";
 import pool from "../lib/db"; 
-import { useEffect } from "react";
-
-// --- SSR: OBTENÇÃO DE DADOS NO SERVIDOR ---
-export async function getServerSideProps() {
-  try {
-    const result = await pool.query(`
-      SELECT * FROM logs ORDER BY ts_recebido_servidor DESC LIMIT 1000
-    `);
-
-    const rawLogs = result.rows;
-
-    const logs = rawLogs.map(row => ({
-      ...row,
-      id: row.id,
-      ts_recebido_placa: row.ts_recebido_placa?.toISOString() || null,
-      ts_inicio_execucao: row.ts_inicio_execucao?.toISOString() || null,
-      ts_fim_execucao: row.ts_fim_execucao?.toISOString() || null,
-      ts_recebido_servidor: row.ts_recebido_servidor?.toISOString() || null,
-    }));
-
-    // Retorna APENAS a carga de dados. A matemática das métricas será feita no cliente
-    // para que reaja perfeitamente aos filtros.
-    return {
-      props: { initialLogs: logs },
-    };
-  } catch (error) {
-    console.error("Erro SSR ao buscar logs:", error);
-    return { props: { initialLogs: [] } };
-  }
-}
-
-const NAV = [
-  { name: "Painel de Telemetria", active: false, href: "/dashboard", icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" },
-  { name: "Gestão de Usuários",   active: false, href: "/usuarios", icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" },
-  { name: "Logs & Auditoria",     active: true,  href: "/logs",     icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
-  { name: "Parametrização",       active: false, href: "/config",   icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" },
-];
+import Sidebar from "../components/Sidebar";
+import Head from "next/head";
 
 export default function LogsBI({ initialLogs = [] }) {
   const [sidebar, setSidebar] = useState(true);
   const boardOnline = useTankStore((state) => state.boardOnline);
-  
+  const userRole = useTankStore((state) => state.userRole);
+
   // Estados dos Filtros Locais
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [filtroTanque, setFiltroTanque] = useState("TODOS");
@@ -185,8 +151,6 @@ export default function LogsBI({ initialLogs = [] }) {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // --- MOTOR GRÁFICO DINÂMICO SVG ---
-  // --- MOTOR GRÁFICO DINÂMICO SVG ---
   // --- MOTOR GRÁFICO DINÂMICO SVG (Com Switch e Interatividade) ---
   const renderDynamicChart = () => {
     if (logsFiltrados.length === 0) {
@@ -203,7 +167,7 @@ export default function LogsBI({ initialLogs = [] }) {
 
     // Função para calcular clique e posicionar o Tooltip
     const handleBarClick = (e, val, titleStr, timeStr) => {
-      e.stopPropagation(); // Impede que o clique feche o tooltip imediatamente
+      e.stopPropagation(); 
       const svgRect = e.currentTarget.closest('svg').getBoundingClientRect();
       const x = e.clientX - svgRect.left;
       const y = e.clientY - svgRect.top;
@@ -351,43 +315,45 @@ export default function LogsBI({ initialLogs = [] }) {
 
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
-      
+      <Head>
+        <title>Logs & Auditoria - Nexus OS</title>
+      </Head>
+      {/* Mobile overlay */}
+      {sidebar && (
+        <div className="fixed inset-0 bg-slate-900/60 z-20 md:hidden backdrop-blur-sm"
+          onClick={() => setSidebar(false)} />
+      )}
+
       {/* ══ SIDEBAR ══ */}
-      <aside className={`fixed md:relative z-30 inset-y-0 left-0 h-screen bg-slate-900 border-r border-slate-800 transition-all duration-300 overflow-hidden ${sidebar ? "w-64 translate-x-0" : "w-64 -translate-x-full md:w-0 md:translate-x-0"}`}>
-        <div className="w-64 h-full flex flex-col">
-          <div className="p-5 border-b border-slate-800 flex items-center gap-3 shrink-0">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-900/40">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-            </div>
-            <div><span className="text-white font-bold tracking-wide text-sm block">Nexus Open-Logic</span><span className="text-slate-500 text-[10px]">v2.4.1 — BI Platform</span></div>
-          </div>
-          <nav className="flex-1 p-3 space-y-1 text-sm font-medium overflow-y-auto">
-            {NAV.map((item) => (
-              <a key={item.name} href={item.href} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${item.active ? "bg-blue-600/10 text-blue-400 border border-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
-                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /></svg>
-                {item.name}
-              </a>
-            ))}
-          </nav>
-        </div>
-      </aside>
+      <Sidebar isOpen={sidebar} activeRoute="/logs" />
 
       {/* ══ MAIN WORKSPACE ══ */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         
         {/* Topbar */}
-        <header className="bg-white px-5 py-3 flex items-center justify-between shadow-sm z-10 shrink-0 relative">
+        {/* Topbar Padronizada */}
+        <header className="bg-white px-5 py-4 flex items-center justify-between shadow-sm z-10 shrink-0 relative">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebar(!sidebar)} className="p-2 rounded-lg bg-slate-50 border border-slate-200"><svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg></button>
-            <span className="font-bold tracking-tight text-base text-slate-700">Business Intelligence & Auditoria</span>
+            <button onClick={() => setSidebar(!sidebar)} className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors">
+              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <h1 className="font-bold tracking-tight text-lg text-slate-800 hidden sm:block">
+              Business Intelligence & Auditoria
+            </h1>
           </div>
-          <span className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${boardOnline ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${boardOnline ? "bg-emerald-500" : "bg-red-500"}`} /> {boardOnline ? "Placa Online" : "Placa Offline"}
-          </span>
+          
+          <div className="flex items-center gap-3">
+            <span className={`flex items-center gap-1.5 text-[11px] font-bold capitalize tracking-wider px-3 py-1.5 rounded-full border ${boardOnline ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${boardOnline ? "bg-emerald-500" : "bg-red-500"}`} /> {boardOnline ? "Online" : "Offline"}
+            </span>
+            <span className="text-[11px] font-bold capitalize tracking-wider text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+              ID: {userRole || 'Visitante'}
+            </span>
+          </div>
         </header>
 
         {/* ── BARRA DE CONTROLE E FILTROS DINÂMICOS ── */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-wrap gap-4 items-center justify-between z-10 relative">
+        <div className="bg-white border-b border-slate-200 shadow-sm px-6 lg:px-12 py-3 flex flex-wrap gap-4 items-center justify-between z-10 shrink-0">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 pl-2">
               <div className="p-1.5 bg-slate-800 text-white rounded-md shadow-sm">
@@ -435,9 +401,9 @@ export default function LogsBI({ initialLogs = [] }) {
           </div>
         </div>
 
-        {/* ── CONTEÚDO PRINCIPAL ── */}
-        <div className="flex-1 overflow-y-auto bg-slate-50/50">
-          <div className="p-5 max-w-[1200px] mx-auto w-full flex flex-col gap-5">
+        {/* ── CONTEÚDO PRINCIPAL (EXPANDIDO HORIZONTALMENTE) ── */}
+        <div className="flex-1 overflow-y-auto bg-slate-50/50 w-full px-6 lg:px-12 py-6">
+          <div className="w-full flex flex-col gap-5">
             
             {/* ── METRIC CARDS ROW ── */}
             <div className="grid grid-cols-4 gap-4">
@@ -450,8 +416,6 @@ export default function LogsBI({ initialLogs = [] }) {
                 <p className="text-[10px] text-slate-400 mt-3">Tempo médio do filtro atual</p>
               </button>
 
-              {/* Latência (Com Cores Reativas) */}
-              {/* Latência (Com Cores Reativas e Barra Proporcional) */}
               <button 
                 onClick={() => setActiveMetric("latencia")} 
                 className={`text-left rounded-xl border shadow-sm p-4 flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 
@@ -465,7 +429,6 @@ export default function LogsBI({ initialLogs = [] }) {
                   </p>
                 </div>
                 <div className="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden">
-                  {/* A mágica acontece aqui: A barra cresce proporcionalmente até o limite de 5000ms */}
                   <div className={`h-full transition-all ${metrics.latenciaMediaMs > 5000 ? "bg-amber-500" : "bg-emerald-500"}`} 
                        style={{ width: logsFiltrados.length ? `${Math.min((metrics.latenciaMediaMs / 5000) * 100, 100)}%` : '0%' }} />
                 </div>
@@ -499,11 +462,10 @@ export default function LogsBI({ initialLogs = [] }) {
             </div>
 
             {/* ── CHARTS SECTION ── */}
-            {/* ── CHARTS SECTION ── */}
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col">
                 
-                {/* CABEÇALHO DO GRÁFICO (Textos, Switch e Total) */}
+                {/* CABEÇALHO DO GRÁFICO */}
                 <div className="mb-4 flex items-start justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">{getChartHeaders().title}</h3>
@@ -530,8 +492,6 @@ export default function LogsBI({ initialLogs = [] }) {
                 
                 {/* CONTAINER DO SVG E TOOLTIP */}
                 <div className="flex-1 w-full min-h-[220px] bg-slate-50/50 rounded-lg border border-slate-100 p-2 flex flex-col justify-between relative" onClick={() => setSelectedBar(null)}>
-                    {/* Texto de Total Movimentado Realocado (Bem implementado em HTML) */}
-                    {/* Texto de Total Movimentado fixo no canto superior direito */}
                     {activeMetric === "consumo" && (
                       <div className="absolute top-2 right-2 text-blue-700 text-[10px] font-bold drop-shadow-sm">
                         TOTAL MOVIMENTADO: {metrics.consumoTotalL.toFixed(1)} L
@@ -563,15 +523,6 @@ export default function LogsBI({ initialLogs = [] }) {
                   <div>
                     <div className="flex justify-between text-xs font-semibold text-slate-600 mb-1">
                       <span className="flex items-center gap-1.5">
-                        {/* Ícone de computador
-                        <svg xmlns="http://www.w3.org/2000/svg" 
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            strokeWidth="1.5" 
-                            stroke="currentColor" 
-                            className="w-3.5 h-3.5 text-slate-600">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" />
-                        </svg> */}
                         DASHBOARD WEB
                       </span>
                       <span className="font-mono">{webPct}%</span>
@@ -584,15 +535,6 @@ export default function LogsBI({ initialLogs = [] }) {
                   <div>
                     <div className="flex justify-between text-xs font-semibold text-slate-600 mb-1">
                       <span className="flex items-center gap-1.5">
-                        {/* Ícone de RFID 
-                        <svg xmlns="http://www.w3.org/2000/svg" 
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            strokeWidth="1.5" 
-                            stroke="currentColor" 
-                            className="w-3.5 h-3.5 text-slate-600">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-                        </svg>*/}
                         SISTEMA FISICO
                       </span>
                       <span className="font-mono">{rfidPct}%</span>
@@ -602,7 +544,6 @@ export default function LogsBI({ initialLogs = [] }) {
                     </div>
                   </div>
                 </div>
-
 
                 <div className="border-t border-slate-100 pt-4 mt-4">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-2">Total do Período</span>
@@ -743,4 +684,44 @@ export default function LogsBI({ initialLogs = [] }) {
       </main>
     </div>
   );
+}
+
+export async function getServerSideProps(context) {
+  const cookies = context.req.headers.cookie || '';
+  const match = cookies.match(/nexus_role=([^;]+)/);
+  const userRole = match ? match[1] : null;
+
+  // Bloqueio de Servidor: Gestor e Operador permitidos. Visualizador é expulso.
+  if (userRole !== 'gestor' && userRole !== 'operador') {
+    return {
+      redirect: {
+        destination: userRole ? '/dashboard' : '/',
+        permanent: false,
+      },
+    };
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT * FROM logs ORDER BY ts_recebido_servidor DESC LIMIT 1000
+    `);
+
+    const rawLogs = result.rows;
+
+    const logs = rawLogs.map(row => ({
+      ...row,
+      id: row.id,
+      ts_recebido_placa: row.ts_recebido_placa?.toISOString() || null,
+      ts_inicio_execucao: row.ts_inicio_execucao?.toISOString() || null,
+      ts_fim_execucao: row.ts_fim_execucao?.toISOString() || null,
+      ts_recebido_servidor: row.ts_recebido_servidor?.toISOString() || null,
+    }));
+
+    return {
+      props: { initialLogs: logs },
+    };
+  } catch (error) {
+    console.error("Erro SSR ao buscar logs:", error);
+    return { props: { initialLogs: [] } };
+  }
 }
