@@ -5,7 +5,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Método não permitido.' });
   }
 
-  const { matricula, password } = req.body;
+  // O .trim() remove espaços vazios acidentais no início e fim do texto
+  const matricula = (req.body.matricula || '').trim();
+  const password = req.body.password;
+
+  console.log(`[AUTH API] Tentativa de login para matrícula: "${matricula}"`);
 
   try {
     const result = await pool.query(
@@ -14,22 +18,22 @@ export default async function handler(req, res) {
     );
 
     if (result.rows.length === 0) {
+      console.log(`[AUTH API] Matrícula "${matricula}" não encontrada no banco.`);
       return res.status(401).json({ message: 'Matrícula não encontrada.' });
     }
 
     const user = result.rows[0];
-    
-    // Suporta tanto a coluna "senha" quanto "password" caso haja variação no seu banco
     const dbPassword = user.senha || user.password;
 
+    console.log(`[AUTH API] Matrícula encontrada. Setor do usuário: "${user.setor}"`);
+
     if (password !== dbPassword) {
+      console.log(`[AUTH API] Falha: A senha digitada não corresponde à do banco.`);
       return res.status(401).json({ message: 'Chave de segurança incorreta.' });
     }
 
     let userRole = 'visualizacao'; 
 
-    // Adaptado para suportar os valores que você usa no seu formulário (Gestão/Produção/Manutenção) 
-    // ou os valores em minúsculo do seu exemplo.
     if (user.setor === 'gestor' || user.setor === 'Gestão') {
       userRole = 'gestor';
     } else if (user.setor === 'operador' || user.setor === 'Produção') {
@@ -38,6 +42,8 @@ export default async function handler(req, res) {
       userRole = 'visualizacao'; 
     }
 
+    console.log(`[AUTH API] Sucesso. Cargo definido: ${userRole}`);
+
     return res.status(200).json({ 
       message: 'Autenticado com sucesso',
       role: userRole,
@@ -45,7 +51,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Erro na autenticação:', error);
+    console.error('[AUTH API] Erro fatal no servidor:', error);
     return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 }

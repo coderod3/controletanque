@@ -249,9 +249,9 @@ export default function GestaoUsuarios({ usuariosIniciais }) {
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="setor">Setor</label>
                   <select id="setor" value={formUsuario.setor} onChange={handleInputChange} className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
-                    <option value="Produção">Produção</option>
-                    <option value="Manutenção">Manutenção</option>
-                    <option value="Gestão">Gestão</option>
+                    <option value="operador">Operador</option>
+                    <option value="visualizador">Visualização</option>
+                    <option value="gestor">Gestão</option>
                   </select>
                 </div>
               </div>
