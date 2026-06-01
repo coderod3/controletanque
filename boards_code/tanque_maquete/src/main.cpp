@@ -218,11 +218,26 @@ void loop() {
                 LogOperacao logAudit;
                 float alvoReq = ControleNivel.getAlvo();
                 
-                strncpy(logAudit.tipo_operacao, (alvoReq > vol_inicial_tarefa) ? "ENCHER" : "ESVAZIAR", sizeof(logAudit.tipo_operacao) - 1);
-                strncpy(logAudit.usuario_id, ctx_usuario.c_str(), sizeof(logAudit.usuario_id) - 1);
-                strncpy(logAudit.origem_comando, ctx_origem.c_str(), sizeof(logAudit.origem_comando) - 1);
-                strncpy(logAudit.status, (btn == CONFIRMA) ? "CANCELADO" : "SUCESSO", sizeof(logAudit.status) - 1);
-                
+                strncpy(logAudit.tipo_operacao,
+                        (alvoReq > vol_inicial_tarefa) ? "ENCHER" : "ESVAZIAR",
+                        sizeof(logAudit.tipo_operacao) - 1);
+                logAudit.tipo_operacao[sizeof(logAudit.tipo_operacao) - 1] = '\0';
+
+                strncpy(logAudit.usuario_id,
+                        ctx_usuario.c_str(),
+                        sizeof(logAudit.usuario_id) - 1);
+                logAudit.usuario_id[sizeof(logAudit.usuario_id) - 1] = '\0';
+
+                strncpy(logAudit.origem_comando,
+                        ctx_origem.c_str(),
+                        sizeof(logAudit.origem_comando) - 1);
+                logAudit.origem_comando[sizeof(logAudit.origem_comando) - 1] = '\0';
+
+                strncpy(logAudit.status,
+                        (btn == CONFIRMA) ? "CANCELADO" : "SUCESSO",
+                        sizeof(logAudit.status) - 1);
+                logAudit.status[sizeof(logAudit.status) - 1] = '\0';
+
                 logAudit.volume_alvo = alvoReq;
                 logAudit.volume_inicial = vol_inicial_tarefa;
                 logAudit.volume_final = Sensor.lerLitros();

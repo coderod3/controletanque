@@ -49,10 +49,10 @@ void AuditoriaAPI::taskHTTP(void *pvParameters) {
                 // Montagem eficiente do JSON
                 String json = "{";
                 json += "\"tanque_id\":\"" + String(MQTT_CLIENT_ID) + "\",";
-                json += "\"usuario_id\":\"" + log.usuario_id + "\",";
-                json += "\"tipo_operacao\":\"" + log.tipo_operacao + "\",";
-                json += "\"origem_comando\":\"" + log.origem_comando + "\",";
-                json += "\"status\":\"" + log.status + "\",";
+                json += "\"usuario_id\":\"" + String(log.usuario_id) + "\",";
+                json += "\"tipo_operacao\":\"" + String(log.tipo_operacao) + "\",";
+                json += "\"origem_comando\":\"" + String(log.origem_comando) + "\",";
+                json += "\"status\":\"" + String(log.status) + "\",";
                 json += "\"fisica\":{";
                 json += "\"volume_alvo\":" + String(log.volume_alvo, 1) + ",";
                 json += "\"volume_inicial\":" + String(log.volume_inicial, 1) + ",";

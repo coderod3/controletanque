@@ -4,10 +4,10 @@
 #include <Arduino.h>
 
 struct LogOperacao {
-    String tipo_operacao;
-    String usuario_id;
-    String origem_comando;
-    String status;
+    char usuario_id[50];
+    char tipo_operacao[20];
+    char origem_comando[50];
+    char status[50];
     float volume_alvo;
     float volume_inicial;
     float volume_final;
@@ -15,6 +15,7 @@ struct LogOperacao {
     unsigned long inicio_ms;
     unsigned long fim_ms;
 };
+
 
 class AuditoriaAPI {
 public:
