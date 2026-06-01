@@ -72,7 +72,7 @@
 // AUDITORIA E REST API
 // =============================================================================
 #define NTP_SERVER         "pool.ntp.org"
-#define API_AUDITORIA_URL  "http://controletanque.vercel.app/api/auditoria" // Mude para seu domínio depois
+#define API_AUDITORIA_URL  "https://controletanque.vercel.app/api/auditoria" // Mude para seu domínio depois
 
 
 #endif // CONFIG_H

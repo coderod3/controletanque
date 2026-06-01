@@ -15,7 +15,7 @@ void GerenciadorMQTTAPI::iniciar() {
     
     // NOVO: Força o HiveMQ a ser impaciente. 
     // Se a placa sumir por 5 segundos, ele dispara o LWT.
-    mqttClient.setKeepAlive(5); 
+    mqttClient.setKeepAlive(10); 
 
     Serial.println("[MQTT] Servico inicializado.");
 }

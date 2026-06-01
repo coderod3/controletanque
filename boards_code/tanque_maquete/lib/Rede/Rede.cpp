@@ -12,12 +12,15 @@ void RedeAPI::iniciar() {
     filaTX = xQueueCreate(20, sizeof(MensagemSaida));
     filaRX = xQueueCreate(10, sizeof(ComandoEntrada));
 
-    // 2. Dispara o orquestrador no CORE 0
+    // 2. Dispara o orquestrador no CORE 0 usando Lambda Segura
     xTaskCreatePinnedToCore(
-        this->_taskRede,
+        [](void* param) {
+            RedeAPI* instancia = (RedeAPI*)param;
+            instancia->_taskRede(NULL);
+        },
         "TaskRede",
         10000, 
-        this,
+        this, // Injeta a própria classe no parâmetro do FreeRTOS
         1,
         NULL,
         0 // NÚCLEO ZERO
@@ -33,14 +36,14 @@ void RedeAPI::_taskRede(void* pvParameters) {
     GerenciadorOTA.iniciar();
 
     for (;;) {
-        // 1. Mantém o link WiFi (IP Fixo .115)
+        // 1. Mantém o link WiFi
         ConexaoWiFi.manter();
 
         if (ConexaoWiFi.estaConectado()) {
-            // 2. Processa o OTA (Permite upload wireless)
+            // 2. Processa o OTA
             GerenciadorOTA.lidar();
 
-            // 3. Processa o MQTT (Envia o que está na fila e recebe novos dados)
+            // 3. Processa o MQTT
             GerenciadorMQTT.processar();
         }
 
