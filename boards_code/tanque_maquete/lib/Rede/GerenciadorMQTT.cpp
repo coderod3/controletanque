@@ -1,23 +1,20 @@
 #include "GerenciadorMQTT.h"
 #include "Rede.h"
 #include "Config.h"
-#include <WiFiClientSecure.h>
+#include <WiFiClient.h> // <--- Usando Cliente Wi-Fi Normal (Rápido)
 #include <PubSubClient.h>
 
-static WiFiClientSecure espClient;
+static WiFiClient espClient; // <--- Sem "Secure"
 static PubSubClient mqttClient(espClient);
 GerenciadorMQTTAPI GerenciadorMQTT;
 
 void GerenciadorMQTTAPI::iniciar() {
-    espClient.setInsecure(); 
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(this->_callback);
     
-    // NOVO: Força o HiveMQ a ser impaciente. 
-    // Se a placa sumir por 5 segundos, ele dispara o LWT.
     mqttClient.setKeepAlive(10); 
 
-    Serial.println("[MQTT] Servico inicializado.");
+    Serial.println("[MQTT] Servico inicializado (Modo Rapido sem SSL).");
 }
 
 bool GerenciadorMQTTAPI::conectado() {
@@ -45,21 +42,18 @@ void GerenciadorMQTTAPI::_tentarReconectar() {
     if (millis() - ultimaTentativa < 5000) return;
     ultimaTentativa = millis();
 
-    Serial.print("[MQTT] Conectando ao Broker... ");
+    Serial.print("[MQTT] Conectando ao Broker sem criptografia... ");
     
-    // CORREÇÃO: Tópico de Status exclusivo para o Testamento (LWT)
-    const char* lwtTopic = "tanque/status";
+    const char* lwtTopic = TOPIC_STATUS;
     const char* lwtMsg = "{\"status\": \"OFFLINE\"}";
 
-    // Conecta pedindo ao broker para reter a mensagem de morte
-    if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS, lwtTopic, 0, true, lwtMsg)) {
-        Serial.println("OK!");
+    // Conecta APENAS com o ID e o Testamento (LWT). Sem usuário e senha.
+    if (mqttClient.connect(MQTT_CLIENT_ID, lwtTopic, 0, true, lwtMsg)) {
+        Serial.println("OK! Instantâneo!");
         
-        // Assim que conecta, subscreve a mensagem retida mandando um ONLINE
-        mqttClient.publish("tanque/status", "{\"status\": \"ONLINE\"}", true); 
-        
+        mqttClient.publish(TOPIC_STATUS, "{\"status\": \"ONLINE\"}", true); 
         mqttClient.subscribe(TOPIC_COMANDO);
-        // Força a placa a injetar um JSON virtual na fila dela pedindo o GET_SYNC para se auto-publicar
+        
         ComandoEntrada cmdSync;
         strcpy(cmdSync.payload, "{\"comando\": \"GET_SYNC\"}");
         xQueueSend(filaRX, &cmdSync, 0);

@@ -4,7 +4,8 @@
 #include "ControleNivel.h"
 #include "Sensor.h"
 #include "Usuarios.h"
-#include "Parametros.h" // NOVO
+#include "Parametros.h" 
+#include "Config.h" // Traz os tópicos globais
 
 ComandosAPI Comandos;
 
@@ -49,34 +50,34 @@ void ComandosAPI::_processar(String json) {
             
             char logMsg[100];
             snprintf(logMsg, sizeof(logMsg), "{\"msg\": \"Operacao %s aceita. Alvo calculado: %.1f L\"}", acao.c_str(), alvoFinal);
-            Rede.enviar("tanque/logs", logMsg);
+            Rede.enviar(TOPIC_LOGS, logMsg); // VARIÁVEL
         }
     } 
     else if (acao == "PARAR") {
         ControleNivel.parar();
-        Rede.enviar("tanque/logs", "{\"msg\": \"Emergencia: Sistema parado via WEB\"}");
+        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Emergencia: Sistema parado via WEB\"}"); // VARIÁVEL
     }
     
     // 2. PARÂMETROS E HANDSHAKE
     else if (acao == "GET_SYNC") {
-        Rede.enviar("tanque/telemetria/parametros", Parametros.obterJsonCompleto());
-        Rede.enviar("tanque/telemetria/usuarios", Usuarios.obterJsonLista());
+        Rede.enviar(TOPIC_PARAMETROS, Parametros.obterJsonCompleto()); // VARIÁVEL
+        Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
     }
     else if (acao == "SET_PARAM") {
         JsonObject data = doc["payload"];
         Parametros.atualizarDoJson(doc); 
-        Rede.enviar("tanque/telemetria/parametros", Parametros.obterJsonCompleto());
-        Rede.enviar("tanque/logs", "{\"msg\": \"Parametros de engenharia atualizados remotamente\"}");
+        Rede.enviar(TOPIC_PARAMETROS, Parametros.obterJsonCompleto()); // VARIÁVEL
+        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Parametros de engenharia atualizados remotamente\"}"); // VARIÁVEL
         pendenteSync = true; // <--- AVISA A MAIN PARA PISCAR A TELA
     }
     
-    // 3. GERENCIAMENTO DE USUÁRIOS (CRUD)
+    // 3. GERENCIAMENTO DE USUÁRIOS (CRUD) - Bloco 1
     else if (acao == "SYNC_USER") {
         String uid = doc["uid"] | "";
         String nome = doc["nome"] | "Usuario";
         if (uid != "") {
             Usuarios.salvar(uid, nome);
-            Rede.enviar("tanque/telemetria/usuarios", Usuarios.obterJsonLista());
+            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
             pendenteSync = true; // <--- AVISA A MAIN
         }
     }
@@ -84,36 +85,36 @@ void ComandosAPI::_processar(String json) {
         String uid = doc["uid"] | "";
         if (uid != "") {
             Usuarios.remover(uid);
-            Rede.enviar("tanque/telemetria/usuarios", Usuarios.obterJsonLista());
+            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
             pendenteSync = true; // <--- AVISA A MAIN
         }
     }
     else if (acao == "LIMPAR_MEMORIA") {
         Usuarios.limpar();
-        Rede.enviar("tanque/telemetria/usuarios", "[]");
-        Rede.enviar("tanque/logs", "{\"msg\": \"Memoria de usuarios formatada\"}");
+        Rede.enviar(TOPIC_USUARIOS, "[]"); // VARIÁVEL
+        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Memoria de usuarios formatada\"}"); // VARIÁVEL
         pendenteSync = true; // <--- AVISA A MAIN
     }
 
-    // 3. GERENCIAMENTO DE USUÁRIOS (CRUD)
+    // 3. GERENCIAMENTO DE USUÁRIOS (CRUD) - Bloco 2
     else if (acao == "SYNC_USER") {
         String uid = doc["uid"] | "";
         String nome = doc["nome"] | "Usuario";
         if (uid != "") {
             Usuarios.salvar(uid, nome);
-            Rede.enviar("tanque/telemetria/usuarios", Usuarios.obterJsonLista());
+            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
         }
     }
     else if (acao == "DEL_USER") {
         String uid = doc["uid"] | "";
         if (uid != "") {
             Usuarios.remover(uid);
-            Rede.enviar("tanque/telemetria/usuarios", Usuarios.obterJsonLista());
+            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
         }
     }
     else if (acao == "LIMPAR_MEMORIA") {
         Usuarios.limpar();
-        Rede.enviar("tanque/telemetria/usuarios", "[]");
-        Rede.enviar("tanque/logs", "{\"msg\": \"Memoria de usuarios formatada\"}");
+        Rede.enviar(TOPIC_USUARIOS, "[]"); // VARIÁVEL
+        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Memoria de usuarios formatada\"}"); // VARIÁVEL
     }
 }

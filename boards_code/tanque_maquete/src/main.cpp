@@ -158,14 +158,14 @@ void loop() {
 
                         String saudacao = "OLA, " + nomeUser.substring(0, 11);
                         Tela.atualizar(saudacao, "ACESSO LIBERADO ");
-                        Rede.enviar("tanque/logs", "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
+                        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
                         delay(1500);
                         estadoAtual = MENU_AJUSTE;
                         menuIniciado = false;
                         Tela.limpar();
                     } else {
                         Tela.atualizar("  TAG INVALIDA  ", uidLido.substring(0, 16));
-                        Rede.enviar("tanque/logs", "{\"msg\": \"Tentativa de acesso negada: " + uidLido + "\"}");
+                        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Tentativa de acesso negada: " + uidLido + "\"}");
                         delay(1500);
                     }
                 }

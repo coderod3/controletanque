@@ -3,7 +3,10 @@ import { useTankStore } from '../../store/useTankStore';
 export default function LiveLogs() {
   // Seletor Estrito: O componente só re-renderiza quando o array de logs mudar
   const logs = useTankStore((state) => state.logs);
-
+ 
+  // Captura o prefixo definido no .env.local ou na Vercel
+  const topicPrefix = process.env.NEXT_PUBLIC_MQTT_TOPIC_PREFIX || 'nx_tanque_8f7d6c5b';
+ 
   // Formatador de horas (Padrão 24h brasileiro)
   const formatTime = (timestamp) => {
     return new Intl.DateTimeFormat('pt-BR', {
@@ -18,7 +21,7 @@ export default function LiveLogs() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-gray-800">Terminal de Auditoria</h2>
         <span className="text-xs font-semibold px-2 py-1 bg-gray-200 text-gray-600 rounded">
-          MQTT / tanque/logs
+          MQTT / {topicPrefix}/logs
         </span>
       </div>
 

@@ -55,15 +55,40 @@
 //#define WIFI_SSID         "rodrigowifi"
 //#define WIFI_PASSWORD     "3635840331"
 
-#define MQTT_SERVER       "b5dfbf70844741db84d31800c3bd77a0.s1.eu.hivemq.cloud"
-#define MQTT_PORT         8883            // Porta segura para o ESP32
-#define MQTT_USER         "esp32_tanque"
-#define MQTT_PASS         "Macron@12"
-#define MQTT_CLIENT_ID    "nexus_tank_01"
+// configs mqtt modo seguro criptografado
 
-// Tópicos de comunicação
-#define TOPIC_TELEMETRIA  "tanque/telemetria"
-#define TOPIC_COMANDO     "tanque/comando"
+//#define MQTT_SERVER       "b5dfbf70844741db84d31800c3bd77a0.s1.eu.hivemq.cloud"
+//#define MQTT_PORT         8883            // Porta segura para o ESP32
+//#define MQTT_USER         "esp32_tanque"
+//#define MQTT_PASS         "Macron@12"
+//#define MQTT_CLIENT_ID    "nexus_tank_01"
+
+// =============================================================================
+// CONFIGURAÇÕES DE REDE (MODO APRESENTAÇÃO - SEM SSL)
+// =============================================================================
+#define MQTT_SERVER       "broker.hivemq.com" // Broker Público Rápido
+#define MQTT_PORT         1883                // Porta TCP Crua (Sem Handshake SSL)
+#define MQTT_USER         ""                  
+#define MQTT_PASS         ""                  
+#define MQTT_CLIENT_ID    "nexus_hw_001_pres" // ID único
+
+// Tópicos de comunicação seguro
+//#define TOPIC_TELEMETRIA  "tanque/telemetria"
+//#define TOPIC_COMANDO     "tanque/comando"
+
+// topicos apresentacao
+//#define TOPIC_TELEMETRIA  "nx_tanque_8f7d6c5b/telemetria"
+//#define TOPIC_COMANDO     "nx_tanque_8f7d6c5b/comando"
+
+#define MQTT_PREFIX "nx_tanque_8f7d6c5b" // SUA ÚNICA VARIÁVEL GLOBAL
+
+// O C++ vai concatenar as strings automaticamente durante a compilação
+#define TOPIC_TELEMETRIA  MQTT_PREFIX "/telemetria"
+#define TOPIC_COMANDO     MQTT_PREFIX "/comando"
+#define TOPIC_LOGS        MQTT_PREFIX "/logs"
+#define TOPIC_PARAMETROS  MQTT_PREFIX "/telemetria/parametros"
+#define TOPIC_USUARIOS    MQTT_PREFIX "/telemetria/usuarios"
+#define TOPIC_STATUS      MQTT_PREFIX "/status"
 
 // Comente esta linha para mudar para o EMULADOR
 // #define AMBIENTE_REAL 
