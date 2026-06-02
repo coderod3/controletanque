@@ -26,12 +26,19 @@ export default function Login() {
 
       if (res.ok) {
         const data = await res.json();
+        
+        // CORREÇÃO: Salvar o objeto do utilizador (incluindo as cotas) no cache do navegador
+        localStorage.setItem('authUser', JSON.stringify(data.user)); 
+        
         // Injeta o cargo validado no banco de dados para dentro do sistema
         useTankStore.getState().setUserRole(data.role);
-        // Salva o cargo em um cookie que o servidor consegue ler
+        
+        // Salva o cargo num cookie para o SSR
         document.cookie = `nexus_role=${data.role}; path=/; max-age=86400; SameSite=Strict`;
+        
         router.push('/dashboard');
-      } else {
+      }
+      else {
         const errorData = await res.json();
         setErrorMsg(errorData.message || 'Credenciais inválidas ou sem permissão.');
         setIsLoading(false);

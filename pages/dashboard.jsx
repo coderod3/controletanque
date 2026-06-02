@@ -379,34 +379,33 @@ export default function Dashboard() {
                   </div>
 
                   {(() => {
-                    // Cálculo Seguro (Cruzamento Físico x Crachá)
-                    const authUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('authUser') || '{}') : {};
-                    const localRole = typeof window !== 'undefined' ? String(localStorage.getItem('userRole') || authUser.setor || '') : '';
-
-                    // CORREÇÃO DEFINITIVA: Puxa o cargo direto da Store Global (userRole) além do Cache
+                    // 1. Puxamos o cache e contornamos o sub-objeto "user" da sua API
+                    const authData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('authUser') || '{}') : {};
+                    const userData = authData.user ? authData.user : authData; // Acha os limites mesmo se estiverem aninhados
+                    
+                    const localRole = typeof window !== 'undefined' ? String(localStorage.getItem('userRole') || userData.setor || '') : '';
                     const roleCheck = (String(userRole) + " " + localRole).toLowerCase();
                     const isGestor = roleCheck.includes('gest') || roleCheck.includes('admin');
 
-                    // Limites Físicos Absolutos
+                    // 2. Cotas do Usuário
+                    const cotaEncher = isGestor ? capacidadeMaxima : (Number(userData.limite_encher) || 0);
+                    const cotaEsvaziar = isGestor ? capacidadeMaxima : (Number(userData.limite_esvaziar) || 0);
+
+                    // 3. Limites Físicos Absolutos
                     const fisicoEncher = Math.max(0, capacidadeMaxima - tankLevelLiters);
                     const fisicoEsvaziar = Math.max(0, tankLevelLiters);
 
-                    // Cotas do Usuário (Gestor recebe o limite máximo do tanque, usuário recebe a cota do crachá)
-                    const cotaEncher = isGestor ? capacidadeMaxima : (Number(authUser.limite_encher) || 0);
-                    const cotaEsvaziar = isGestor ? capacidadeMaxima : (Number(authUser.limite_esvaziar) || 0);
-
-                    // Limite Real (O Menor entre a cota e o que o tanque aguenta fisicamente)
+                    // 4. Cruzamento Real
                     const limiteAtual = operation === "fill" ? Math.min(fisicoEncher, cotaEncher) : Math.min(fisicoEsvaziar, cotaEsvaziar);
-                    const limiteFisico = operation === "fill" ? fisicoEncher : fisicoEsvaziar;
+                    const cotaAtual = operation === "fill" ? cotaEncher : cotaEsvaziar;
+                    const fisicoAtual = operation === "fill" ? fisicoEncher : fisicoEsvaziar;
 
-                    const maxSlider = capacidadeMaxima; 
                     const isOverLimit = volume > limiteAtual;
-                    const isValid = volume > 0 && !isOverLimit;
-                    const isOpDisabled = limiteAtual < 0.1 || isReadOnly;
+                    const isValid = volume > 0 && !isOverLimit && limiteAtual > 0;
 
                     return (
                       <>
-                        {/* INPUT E SLIDER */}
+                        {/* INPUT E SLIDER TOTALMENTE DESTRAVADOS */}
                         <div>
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Volume Relativo</span>
@@ -418,21 +417,21 @@ export default function Dashboard() {
                             </div>
                             <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold ${isOverLimit ? 'text-red-400' : 'text-slate-400'}`}>L</span>
                           </div>
-                          <input type="range" min="0.1" max={maxSlider} step="0.1"
+                          
+                          {/* O slider NÃO TEM MAIS ATRIBUTO DISABLED. Fica solto e livre! */}
+                          <input type="range" min="0.1" max={capacidadeMaxima} step="0.1"
                             value={volume}
                             onChange={(e) => setVolume(parseFloat(e.target.value))}
-                            disabled={isReadOnly || busy}
-                            className={`w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"}`} />
+                            className={`w-full cursor-pointer ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"}`} />
                           
-                          {/* Feedback de erro instantâneo se ultrapassar a cota */}
-                          {/* Feedback de erro instantâneo se ultrapassar a cota */}
-                          {isOverLimit && (
+                          {/* Mensagem de Erro Inteligente */}
+                          {(isOverLimit || limiteAtual <= 0) && (
                             <p className="text-[10px] text-red-500 font-medium mt-1.5 text-center">
-                              {limiteAtual <= 0 
-                                ? (limiteFisico <= 0 
-                                  ? `Operação indisponível. O tanque já está ${operation === "fill" ? "cheio" : "vazio"}.` 
-                                  : `Bloqueado: Sua cota para ${operation === "fill" ? "encher" : "esvaziar"} é zero.`)
-                                : `O volume excede o limite disponível de ${limiteAtual.toFixed(1)}L.`}
+                              {fisicoAtual <= 0 
+                                ? `O tanque já está fisicamente ${operation === "fill" ? "cheio" : "vazio"}.` 
+                                : cotaAtual <= 0 
+                                  ? `Sua cota de limite para ${operation === "fill" ? "encher" : "esvaziar"} é 0L.` 
+                                  : `O volume excede o limite disponível de ${limiteAtual.toFixed(1)}L.`}
                             </p>
                           )}
                         </div>
@@ -442,7 +441,7 @@ export default function Dashboard() {
                           <button 
                             onClick={() => {
                               const acao = operation === "fill" ? "ENCHER" : "ESVAZIAR";
-                              sendCommand(acao, volume, authUser.matricula, authUser.nome);
+                              sendCommand(acao, volume, userData.matricula, userData.nome);
                             }}
                             disabled={busy || !boardOnline || !mqttOk || !isValid || isReadOnly}
                             className={`w-full py-3 font-bold text-sm rounded-xl text-white transition-all flex items-center justify-center gap-2
@@ -454,7 +453,7 @@ export default function Dashboard() {
                           {/* BOTÃO CANCELAR DISCRETO (SÓ APARECE QUANDO OCUPADO) */}
                           {busy && (
                             <button
-                              onClick={() => sendCommand('PARAR', 0, authUser.matricula, authUser.nome)}
+                              onClick={() => sendCommand('PARAR', 0, userData.matricula, userData.nome)}
                               className="w-full mt-2 py-1.5 text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
