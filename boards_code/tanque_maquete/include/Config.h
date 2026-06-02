@@ -49,8 +49,11 @@
 // =============================================================================
 // CONFIGURAÇÕES DE REDE (Onde estavam os erros)
 // =============================================================================
-#define WIFI_SSID         "Wokwi-GUEST"
-#define WIFI_PASSWORD     ""
+//#define WIFI_SSID         "Wokwi-GUEST"
+//#define WIFI_PASSWORD     ""
+
+#define WIFI_SSID         "placa"
+#define WIFI_PASSWORD     "12345678"
 
 //#define WIFI_SSID         "rodrigowifi"
 //#define WIFI_PASSWORD     "3635840331"
