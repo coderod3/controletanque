@@ -136,7 +136,7 @@ export default function GestaoUsuarios({ usuariosIniciais }) {
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
       <Head>
-        <title>Gestão de Usuários - Nexus OS</title>
+        <title>Gestão de Usuários - Revita OS</title>
       </Head>
 
       {/* Mobile overlay */}
@@ -309,7 +309,7 @@ export default function GestaoUsuarios({ usuariosIniciais }) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="email">E-mail</label>
-                <input id="email" type="email" required value={formUsuario.email} onChange={handleInputChange} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500" placeholder="nome@nexus.com"/>
+                <input id="email" type="email" required value={formUsuario.email} onChange={handleInputChange} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500" placeholder="nome@revita.com"/>
               </div>
 
               <div>
@@ -330,7 +330,7 @@ export default function GestaoUsuarios({ usuariosIniciais }) {
 
               {!usuarioEditandoId && (
                 <div className="text-[10px] text-slate-500 bg-amber-50 p-2 rounded border border-amber-100">
-                  * A senha inicial para novos acessos web será automaticamente: <b>nexus123</b>.
+                  * A senha inicial para novos acessos web será automaticamente: <b>revita123</b>.
                 </div>
               )}
 

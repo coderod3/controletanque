@@ -65,7 +65,7 @@ void espelharEstadoWeb() {
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("\n--- NEXUS OS | INICIALIZANDO ---");
+    Serial.println("\n--- REVITA OS | INICIALIZANDO ---");
     
     Rede.iniciar();
     Usuarios.iniciar();
@@ -83,7 +83,7 @@ void setup() {
     pinMode(PIN_LED_G, OUTPUT);
     pinMode(PIN_LED_B, OUTPUT);
 
-    Tela.atualizar("    NEXUS OS    ", " SISTEMA ONLINE ");
+    Tela.atualizar("    REVITA OS    ", " SISTEMA ONLINE ");
     delay(1000);
 }
 
@@ -171,8 +171,19 @@ void loop() {
                         ctx_usuario = nomeUser;
                         ts_recebido = millis(); 
                         ts_ultimo_interacao = millis(); // Inicia a sessão de 10s
+                        
+                        int posEspaco = nomeUser.indexOf(" "); // retorna o índice do primeiro espaço
+                        String primeiroNome;
 
-                        String saudacao = "OLA, " + nomeUser.substring(0, 11);
+                        if (posEspaco != -1) {
+                            // pega do início até o espaço
+                            primeiroNome = nomeUser.substring(0, posEspaco);
+                        } else {
+                            // se não houver espaço, pega o nome inteiro
+                            primeiroNome = nomeUser;
+                        }
+                        
+                        String saudacao = "OLA, " + primeiroNome;
                         Tela.atualizar(saudacao, "ACESSO LIBERADO ");
                         Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
                         delay(1500);
@@ -269,7 +280,7 @@ void loop() {
             {
                 float alvoReal = ControleNivel.getAlvo();
                 String l1 = "ALVO: " + String(alvoReal, 0) + " L";
-                String l2 = "ATU : " + String(volAtual, 1) + " L";
+                String l2 = "ATUAL : " + String(volAtual, 1) + " L";
                 
                 while(l1.length() < 16) l1 += " ";
                 while(l2.length() < 16) l2 += " ";

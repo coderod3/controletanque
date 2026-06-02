@@ -51,29 +51,14 @@ export default function Login() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden transition-colors duration-500"
+      className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-visible transition-colors duration-500"
       style={{ backgroundColor: bgColor }}
     >
       <Head>
-        <title>Autenticação - Nexus OS</title>
+        <title>Autenticação - Revita OS</title>
       </Head>
 
-      <div className="fixed bottom-6 left-6 bg-black/20 backdrop-blur-md p-3 rounded-xl border border-white/20 shadow-2xl z-50 flex items-center gap-3 hover:bg-black/30 transition-all">
-        <label htmlFor="colorPicker" className="text-xs font-semibold text-white drop-shadow-md cursor-pointer">
-          Tom do Fundo:
-        </label>
-        <input
-          id="colorPicker"
-          type="color"
-          value={bgColor}
-          onChange={(e) => setBgColor(e.target.value)}
-          className="w-10 h-10 rounded cursor-pointer border-0 p-0 bg-transparent"
-          title="Escolha a cor de fundo"
-        />
-        <span className="text-xs text-white/90 font-mono uppercase bg-black/20 px-2 py-1 rounded">{bgColor}</span>
-      </div>
-
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      {/* <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <img 
           src="/img/rice.png" 
           alt="" 
@@ -84,15 +69,16 @@ export default function Login() {
           alt="" 
           className="absolute -right-16 bottom-10 h-[85vh] w-auto object-contain opacity-30 brightness-0 invert drop-shadow-[0_4px_10px_rgba(255,255,255,0.1)]"
         />
-      </div>
+      </div> */}
 
-      <div className="absolute bottom-0 left-0 w-full pointer-events-none z-0">
+      <div className="absolute bottom-0 left-0 w-full pointer-events-none z-20">
         <img 
           src="/img/grass-footer.png" 
           alt="" 
           className="w-full h-32 md:h-48 object-cover object-bottom opacity-40 brightness-0 invert"
         />
       </div>
+
 
       <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-white/10 rounded-full blur-[150px] pointer-events-none z-0"></div>
       <div className="absolute bottom-0 left-1/4 w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[150px] pointer-events-none z-0"></div>
@@ -101,7 +87,7 @@ export default function Login() {
         
         <div className="text-center mb-6">
           <h1 className="text-3xl font-extrabold text-white tracking-tight shadow-black/10 drop-shadow-md">
-            Nexus Open-Logic
+            Revita Open-Logic
           </h1>
           <p className="text-white/80 text-sm font-medium mt-1">
             Gestão Integrada de Fluidos e Cultura
@@ -114,7 +100,7 @@ export default function Login() {
             <div className="w-16 h-16 mb-4">
               <img 
                 src="/logo.png" 
-                alt="Nexus Open-Logic" 
+                alt="Revita Open-Logic" 
                 className="w-full h-full object-contain drop-shadow-sm"
               />
             </div>

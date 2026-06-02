@@ -101,7 +101,7 @@ export default function Config() {
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
       <Head>
-        <title>Parametrização - Nexus OS</title>
+        <title>Parametrização - Revita OS</title>
       </Head>
       {/* Mobile overlay */}
       {sidebar && (

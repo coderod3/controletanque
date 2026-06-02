@@ -212,7 +212,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
       <Head>
-        <title>Painel de Controle - Nexus OS</title>
+        <title>Painel de Controle - Revita OS</title>
       </Head>
       
       {/* Mobile overlay */}

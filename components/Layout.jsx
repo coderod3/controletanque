@@ -79,7 +79,7 @@ export default function Layout({ children, setorUsuario = 'Gestão' }) {
             <div className="w-8 h-8 bg-white rounded flex items-center justify-center p-1">
               <img src="/logo.png" alt="Nexus" className="w-full h-full object-contain" />
             </div>
-            <span className="text-white font-bold tracking-wide text-sm">Nexus Open-Logic</span>
+            <span className="text-white font-bold tracking-wide text-sm">Revita Open-Logic</span>
           </div>
 
           <nav className="flex-1 p-4 space-y-2 text-sm font-medium overflow-y-auto">

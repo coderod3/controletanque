@@ -316,7 +316,7 @@ export default function LogsBI({ initialLogs = [] }) {
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
       <Head>
-        <title>Logs & Auditoria - Nexus OS</title>
+        <title>Logs & Auditoria - Revita OS</title>
       </Head>
       {/* Mobile overlay */}
       {sidebar && (

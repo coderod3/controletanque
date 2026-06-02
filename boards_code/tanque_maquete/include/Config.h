@@ -24,11 +24,12 @@
 // =============================================================================
 // PARÂMETROS DO TANQUE (Escala 1:1 para Emulador)
 // =============================================================================
-#define TANK_HEIGHT_EMPTY 100.0 // 100cm de distância = 0 Litros
-#define TANK_HEIGHT_FULL  2.0   // 0cm de distância = 100 Litros
-#define TANK_MAX_DIST     18.0 // Margem para erro de leitura no emulador
-#define TANK_MAX_VOLUME   20.0 // Volume máximo para travas de software
+#define TANK_HEIGHT_EMPTY 18.5  // 18cm lidos = Vazio
+#define TANK_HEIGHT_FULL  3.0   // 2cm lidos = Cheio
+#define TANK_MAX_DIST     20.0  // Acima disso = Erro/Manutenção
+#define TANK_MAX_VOLUME   100.0 // Nova escala alvo: 100L
 #define TANK_SAFE_MARGIN  0.5
+
 
 // --- CONFIGURAÇÕES DO SENSOR ULTRASSÔNICO ---
 #define SENSOR_SAMPLES 8                  // Quantidade de leituras para extrair a mediana
