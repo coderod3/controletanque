@@ -13,10 +13,10 @@ export default function Config() {
 
   // Rascunho Local
   const [params, setParams] = useState({
-    TANK_HEIGHT_EMPTY: 100.0,
+    TANK_HEIGHT_EMPTY: 18.0,
     TANK_HEIGHT_FULL: 2.0,
     TANK_MAX_DIST: 22.0,
-    TANK_MAX_VOLUME: 18.0,
+    TANK_MAX_VOLUME: 100.0,
     TANK_SAFE_MARGIN: 0.5,
     SENSOR_SAMPLES: 8,
     SENSOR_ECHO_DELAY_MS: 40,
