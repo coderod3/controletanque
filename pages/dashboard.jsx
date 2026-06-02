@@ -214,16 +214,15 @@ export default function Dashboard() {
       <Head>
         <title>Painel de Controle - Nexus OS</title>
       </Head>
+      
       {/* Mobile overlay */}
       {sidebar && <div className="fixed inset-0 bg-slate-900/60 z-20 md:hidden backdrop-blur-sm" onClick={() => setSidebar(false)} />}
 
-      {/* Componente Sidebar Extraído */}
       <Sidebar isOpen={sidebar} activeRoute="/dashboard" />
 
-      {/* MAIN */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Topbar */}
-        {/* Topbar Padronizada */}
         <header className="bg-white px-5 py-4 flex items-center justify-between shadow-sm z-10 shrink-0 relative">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebar(!sidebar)} className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors">
@@ -244,7 +243,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* ══ SCROLLABLE CONTENT (EXPANDIDO HORIZONTALMENTE COM w-full e px-fluid) ══ */}
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto bg-slate-50 w-full px-6 lg:px-12 py-6">
           <div className="w-full flex flex-col gap-5">
 
@@ -271,7 +270,7 @@ export default function Dashboard() {
                   <span className={`w-2.5 h-2.5 rounded-full ${boardOnline ? "bg-emerald-500" : "bg-red-500"}`} />
                 </div>
                 <p className={`text-base font-bold mb-0.5 ${boardOnline ? "text-emerald-700" : "text-red-700"}`}>{boardOnline ? "Online" : "Offline"}</p>
-                <p className="text-[10px] text-slate-400 font-mono mb-2.5">ESP32-S3 · 192.168.1.45</p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2.5">ESP32-S3 · Rede Segura</p>
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -280,7 +279,7 @@ export default function Dashboard() {
                   <span className={`w-2.5 h-2.5 rounded-full ${mqttOk ? "bg-emerald-500" : "bg-amber-400"}`} />
                 </div>
                 <p className={`text-base font-bold mb-0.5 ${mqttOk ? "text-emerald-700" : "text-amber-700"}`}>{mqttOk ? "Conectado" : "Desconect."}</p>
-                <p className="text-[10px] text-slate-400 font-mono mb-2.5 truncate">broker.hivemq.com :1883</p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2.5 truncate">SSL/TLS 8883</p>
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -344,7 +343,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* ── COMMAND PANEL (COM BLOQUEIO DE CARGO) ── */}
               {/* ── COMMAND PANEL (DESIGN ORIGINAL COM PROTEÇÕES) ── */}
               <div className="col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
                 
@@ -369,11 +367,11 @@ export default function Dashboard() {
                   <div>
                     <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Operação</span>
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => { setOperation("fill"); setVolume(0.1); }} disabled={isReadOnly || busy}
+                      <button onClick={() => setOperation("fill")} disabled={isReadOnly || busy}
                         className={`py-2.5 rounded-lg text-sm font-bold border transition-colors ${operation === "fill" ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/20" : "bg-slate-50 text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600"} disabled:opacity-50 disabled:pointer-events-none`}>
                         ↑ Encher
                       </button>
-                      <button onClick={() => { setOperation("drain"); setVolume(0.1); }} disabled={isReadOnly || busy}
+                      <button onClick={() => setOperation("drain")} disabled={isReadOnly || busy}
                         className={`py-2.5 rounded-lg text-sm font-bold border transition-colors ${operation === "drain" ? "bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/20" : "bg-slate-50 text-slate-500 border-slate-200 hover:border-orange-300 hover:text-orange-500"} disabled:opacity-50 disabled:pointer-events-none`}>
                         ↓ Esvaziar
                       </button>
@@ -399,9 +397,11 @@ export default function Dashboard() {
                     const maxRealEsvaziar = Math.min(fisicoEsvaziar, cotaEsvaziar);
 
                     const limiteAtual = operation === "fill" ? maxRealEncher : maxRealEsvaziar;
-                    const maxSlider = limiteAtual < 0.1 ? 0.1 : limiteAtual; 
-                    const volumeSeguro = Math.min(volume, maxSlider);
-                    const isOpDisabled = limiteAtual < 0.1 || isReadOnly;
+                    
+                    // O slider SEMPRE permite ir até a capacidade máxima para a UI nunca travar
+                    const maxSlider = capacidadeMaxima; 
+                    const isOverLimit = volume > limiteAtual;
+                    const isValid = volume > 0 && !isOverLimit;
 
                     return (
                       <>
@@ -409,29 +409,38 @@ export default function Dashboard() {
                         <div>
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Volume Relativo</span>
-                            <span className="text-[10px] text-slate-400 font-mono">máx {limiteAtual.toFixed(1)} L</span>
+                            <span className={`text-[10px] font-mono ${isOverLimit ? 'text-red-500 font-bold' : 'text-slate-400'}`}>máx {limiteAtual.toFixed(1)} L</span>
                           </div>
                           <div className="relative mb-2">
-                            <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 text-right font-mono text-sm font-bold text-slate-800 pr-8">
-                              {volumeSeguro.toFixed(1)}
+                            <div className={`w-full border rounded-lg px-3 py-2.5 text-right font-mono text-sm font-bold pr-8 transition-colors ${isOverLimit ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+                              {volume.toFixed(1)}
                             </div>
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">L</span>
+                            <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold ${isOverLimit ? 'text-red-400' : 'text-slate-400'}`}>L</span>
                           </div>
                           <input type="range" min="0.1" max={maxSlider} step="0.1"
-                            value={volumeSeguro}
+                            value={volume}
                             onChange={(e) => setVolume(parseFloat(e.target.value))}
-                            disabled={isOpDisabled || busy}
-                            className={`w-full ${isOpDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"} disabled:opacity-50`} />
+                            disabled={isReadOnly || busy}
+                            className={`w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"}`} />
+                          
+                          {/* Feedback de erro instantâneo se ultrapassar a cota */}
+                          {isOverLimit && (
+                            <p className="text-[10px] text-red-500 font-medium mt-1.5 text-center">
+                              {limiteAtual <= 0 
+                                ? `Operação indisponível. O tanque já está ${operation === "fill" ? "cheio" : "vazio"}.` 
+                                : `O volume excede o limite disponível de ${limiteAtual.toFixed(1)}L.`}
+                            </p>
+                          )}
                         </div>
 
                         {/* ÁREA DE AÇÕES */}
-                        <div>
+                        <div className="mt-2">
                           <button 
                             onClick={() => {
                               const acao = operation === "fill" ? "ENCHER" : "ESVAZIAR";
-                              sendCommand(acao, volumeSeguro, authUser.matricula, authUser.nome);
+                              sendCommand(acao, volume, authUser.matricula, authUser.nome);
                             }}
-                            disabled={busy || !boardOnline || !mqttOk || isOpDisabled || isReadOnly}
+                            disabled={busy || !boardOnline || !mqttOk || !isValid || isReadOnly}
                             className={`w-full py-3 font-bold text-sm rounded-xl text-white transition-all flex items-center justify-center gap-2
                               disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none
                               ${operation === "fill" ? "bg-blue-600 hover:bg-blue-700 active:bg-blue-800" : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700"}`}>
