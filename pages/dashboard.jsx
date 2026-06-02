@@ -380,28 +380,27 @@ export default function Dashboard() {
 
                   {(() => {
                     // Cálculo Seguro (Cruzamento Físico x Crachá)
+                    // Cálculo Seguro (Cruzamento Físico x Crachá)
                     const authUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('authUser') || '{}') : {};
-                    const localRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') || authUser.setor : '';
-                    const isGestor = localRole === 'gestor' || localRole === 'Gestão';
+                    const localRole = typeof window !== 'undefined' ? String(localStorage.getItem('userRole') || authUser.setor || '') : '';
 
-                    // Limites Físicos Absolutos
+                    // CORREÇÃO 1: Agora é imune a letras maiúsculas/minúsculas e reconhece o Gestor corretamente
+                    const isGestor = localRole.toLowerCase().includes('gest');
+
                     const fisicoEncher = Math.max(0, capacidadeMaxima - tankLevelLiters);
                     const fisicoEsvaziar = Math.max(0, tankLevelLiters);
 
-                    // Cotas do Usuário
                     const cotaEncher = isGestor ? capacidadeMaxima : (Number(authUser.limite_encher) || 0);
                     const cotaEsvaziar = isGestor ? capacidadeMaxima : (Number(authUser.limite_esvaziar) || 0);
 
-                    // Limite Real (O Menor entre os dois)
-                    const maxRealEncher = Math.min(fisicoEncher, cotaEncher);
-                    const maxRealEsvaziar = Math.min(fisicoEsvaziar, cotaEsvaziar);
+                    // CORREÇÃO 2: Criada a variável limiteFisico para separar a mensagem de Cota da mensagem de Água
+                    const limiteAtual = operation === "fill" ? Math.min(fisicoEncher, cotaEncher) : Math.min(fisicoEsvaziar, cotaEsvaziar);
+                    const limiteFisico = operation === "fill" ? fisicoEncher : fisicoEsvaziar;
 
-                    const limiteAtual = operation === "fill" ? maxRealEncher : maxRealEsvaziar;
-                    
-                    // O slider SEMPRE permite ir até a capacidade máxima para a UI nunca travar
                     const maxSlider = capacidadeMaxima; 
                     const isOverLimit = volume > limiteAtual;
                     const isValid = volume > 0 && !isOverLimit;
+                    const isOpDisabled = limiteAtual < 0.1 || isReadOnly;
 
                     return (
                       <>
@@ -424,10 +423,13 @@ export default function Dashboard() {
                             className={`w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"}`} />
                           
                           {/* Feedback de erro instantâneo se ultrapassar a cota */}
+                          {/* Feedback de erro instantâneo se ultrapassar a cota */}
                           {isOverLimit && (
                             <p className="text-[10px] text-red-500 font-medium mt-1.5 text-center">
                               {limiteAtual <= 0 
-                                ? `Operação indisponível. O tanque já está ${operation === "fill" ? "cheio" : "vazio"}.` 
+                                ? (limiteFisico <= 0 
+                                  ? `Operação indisponível. O tanque já está ${operation === "fill" ? "cheio" : "vazio"}.` 
+                                  : `Bloqueado: Sua cota para ${operation === "fill" ? "encher" : "esvaziar"} é zero.`)
                                 : `O volume excede o limite disponível de ${limiteAtual.toFixed(1)}L.`}
                             </p>
                           )}
