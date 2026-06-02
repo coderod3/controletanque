@@ -380,20 +380,22 @@ export default function Dashboard() {
 
                   {(() => {
                     // Cálculo Seguro (Cruzamento Físico x Crachá)
-                    // Cálculo Seguro (Cruzamento Físico x Crachá)
                     const authUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('authUser') || '{}') : {};
                     const localRole = typeof window !== 'undefined' ? String(localStorage.getItem('userRole') || authUser.setor || '') : '';
 
-                    // CORREÇÃO 1: Agora é imune a letras maiúsculas/minúsculas e reconhece o Gestor corretamente
-                    const isGestor = localRole.toLowerCase().includes('gest');
+                    // CORREÇÃO DEFINITIVA: Puxa o cargo direto da Store Global (userRole) além do Cache
+                    const roleCheck = (String(userRole) + " " + localRole).toLowerCase();
+                    const isGestor = roleCheck.includes('gest') || roleCheck.includes('admin');
 
+                    // Limites Físicos Absolutos
                     const fisicoEncher = Math.max(0, capacidadeMaxima - tankLevelLiters);
                     const fisicoEsvaziar = Math.max(0, tankLevelLiters);
 
+                    // Cotas do Usuário (Gestor recebe o limite máximo do tanque, usuário recebe a cota do crachá)
                     const cotaEncher = isGestor ? capacidadeMaxima : (Number(authUser.limite_encher) || 0);
                     const cotaEsvaziar = isGestor ? capacidadeMaxima : (Number(authUser.limite_esvaziar) || 0);
 
-                    // CORREÇÃO 2: Criada a variável limiteFisico para separar a mensagem de Cota da mensagem de Água
+                    // Limite Real (O Menor entre a cota e o que o tanque aguenta fisicamente)
                     const limiteAtual = operation === "fill" ? Math.min(fisicoEncher, cotaEncher) : Math.min(fisicoEsvaziar, cotaEsvaziar);
                     const limiteFisico = operation === "fill" ? fisicoEncher : fisicoEsvaziar;
 
