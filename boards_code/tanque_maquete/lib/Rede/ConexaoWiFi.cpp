@@ -3,27 +3,20 @@
 #include "Config.h"
 
 ConexaoWiFiAPI ConexaoWiFi;
-// ARQUIVO PARA TESTES
+
 void ConexaoWiFiAPI::iniciar() {
     _conectado = false;
     _ultimaTentativa = 0;
 
     WiFi.mode(WIFI_STA);
+    
+    // Força a desconexão de qualquer rede velha salva na memória
+    WiFi.disconnect(true);
+    delay(100);
 
-#ifdef AMBIENTE_REAL
-    // Configuração de IP Estático apenas para a placa física
-    IPAddress local_IP(192, 168, 0, 115);
-    IPAddress gateway(192, 168, 0, 1);      
-    IPAddress subnet(255, 255, 255, 0);
-    IPAddress dns(8, 8, 8, 8);
-
-    if (!WiFi.config(local_IP, gateway, subnet, dns)) {
-        Serial.println("[WiFi] Erro ao configurar IP Estatico!");
-    }
-#endif
-    // Se AMBIENTE_REAL não estiver definido (estamos no Wokwi), 
-    // o ESP32 pula o bloco acima e usa DHCP nativamente.
-
+    // Inicia 100% via DHCP (Funciona em Roteador ou Celular)
+    Serial.print("[WiFi] Conectando a rede: ");
+    Serial.println(WIFI_SSID);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
@@ -36,7 +29,6 @@ void ConexaoWiFiAPI::manter() {
         }
     } else {
         _conectado = false;
-        // Tenta reconectar a cada 10 segundos se cair, sem travar o loop
         if (millis() - _ultimaTentativa > 10000) {
             _ultimaTentativa = millis();
             Serial.println("[WiFi] Tentando reconectar...");

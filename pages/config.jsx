@@ -49,17 +49,19 @@ export default function Config() {
   };
 
   const handleSave = () => {
-    // Converte os textos do form para Numéricos Puros
     const numericParams = {};
     for (let key in displayParams) {
         numericParams[key] = Number(displayParams[key]);
     }
     
-    // ATENÇÃO AQUI: Nós enviamos numericParams "solto" como quinto argumento,
-    // sem embrulhar em { payload: ... } para casar com a leitura do C++
+    // Dispara a sincronização
     sendCommand("SET_PARAM", -1, "WEB", "Admin", numericParams);
     
     setHasChanges(false);
+    
+    // Adiciona feedback visual imediato no site e trava a aba como Ocupada
+    useTankStore.getState().setCommandFeedback('Gravando parâmetros no ESP32...');
+    useTankStore.getState().setTelemetry(useTankStore.getState().volume, 'ocupado');
     useTankStore.getState().addLog({ tipo: 'success', fonte: 'WEB', msg: 'Parâmetros enviados e gravados na Flash com sucesso.' });
   };
 

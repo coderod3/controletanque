@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTankStore } from "../store/useTankStore";
 import { sendCommand } from "../lib/mqttService";
 import Sidebar from "../components/Sidebar";
@@ -189,13 +189,10 @@ function SpinIcon({ cls = "w-4 h-4" }) {
    DASHBOARD MAIN
 ══════════════════════════════════════════════════════════ */
 export default function Dashboard() {
-  const [volume, setVolume] = useState(1.0);
-  const [operation, setOperation] = useState("fill");
   const [sidebar, setSidebar] = useState(true);
 
-  // Estados Globais
+  // Estados Globais da Store
   const userRole         = useTankStore((state) => state.userRole);
-  const setUserRole      = useTankStore((state) => state.setUserRole); // Usado na ferramenta de debug no topo
   const mqttOk           = useTankStore((state) => state.mqttOk);
   const boardOnline      = useTankStore((state) => state.boardOnline);
   const tankLevelLiters  = useTankStore((state) => state.volume);
@@ -204,26 +201,64 @@ export default function Dashboard() {
   const logs             = useTankStore((state) => state.logs);
   const capacidadeMaxima = useTankStore((state) => state.capacidadeMaxima);
 
-  // Derivações e Permissões
+  // Derivações Comuns
   const isReadOnly = userRole === "visualizacao";
   const busy = boardState !== "idle" || isSending;
   const porcentagem = Math.min(100, Math.max(0, (tankLevelLiters / capacidadeMaxima) * 100)).toFixed(0);
+
+  // =========================================================================
+  // LÓGICA DO PAINEL DE CONTROLE (SLIDER E LIMITES)
+  // =========================================================================
+  const [alvoInput, setAlvoInput] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Sincroniza a bolinha com o volume atual apenas quando ocioso
+  useEffect(() => {
+    if (!isDragging && boardState === 'idle') {
+      setAlvoInput(tankLevelLiters);
+    }
+  }, [tankLevelLiters, isDragging, boardState]);
+
+  // Recupera credenciais e cotas locais
+  const authUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('authUser') || '{}') : {};
+  const localRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') || authUser.setor : '';
+  const isGestor = localRole === 'gestor' || localRole === 'Gestão';
+
+  // 1. Cotas do Crachá do Usuário Logado
+  const limiteUserEncher = isGestor ? capacidadeMaxima : (Number(authUser.limite_encher) || 0);
+  const limiteUserEsvaziar = isGestor ? capacidadeMaxima : (Number(authUser.limite_esvaziar) || 0);
+
+  // 2. Limites Físicos de acordo com o Nível Atual
+  const maxFisicoEncher = Math.max(0, capacidadeMaxima - tankLevelLiters);
+  const maxFisicoEsvaziar = Math.max(0, tankLevelLiters);
+
+  // 3. A Trava Real: O menor valor entre o Espaço Físico e a Cota Permitida
+  const maxPermitidoEncher = Math.min(maxFisicoEncher, limiteUserEncher);
+  const maxPermitidoEsvaziar = Math.min(maxFisicoEsvaziar, limiteUserEsvaziar);
+
+  // 4. Domínio do Slider: Limitado precisamente pelo permitido acima e abaixo do nível atual
+  const sliderMin = Math.max(0, tankLevelLiters - maxPermitidoEsvaziar);
+  const sliderMax = Math.min(capacidadeMaxima, tankLevelLiters + maxPermitidoEncher);
+
+  // 5. Cálculo do Delta Final para enviar à Placa
+  const delta = alvoInput - tankLevelLiters;
+  const deltaAbsoluto = Math.abs(delta);
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
       <Head>
         <title>Painel de Controle - Nexus OS</title>
       </Head>
+      
       {/* Mobile overlay */}
       {sidebar && <div className="fixed inset-0 bg-slate-900/60 z-20 md:hidden backdrop-blur-sm" onClick={() => setSidebar(false)} />}
 
-      {/* Componente Sidebar Extraído */}
       <Sidebar isOpen={sidebar} activeRoute="/dashboard" />
 
-      {/* MAIN */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Topbar */}
-        {/* Topbar Padronizada */}
         <header className="bg-white px-5 py-4 flex items-center justify-between shadow-sm z-10 shrink-0 relative">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebar(!sidebar)} className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors">
@@ -244,7 +279,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* ══ SCROLLABLE CONTENT (EXPANDIDO HORIZONTALMENTE COM w-full e px-fluid) ══ */}
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto bg-slate-50 w-full px-6 lg:px-12 py-6">
           <div className="w-full flex flex-col gap-5">
 
@@ -271,7 +306,7 @@ export default function Dashboard() {
                   <span className={`w-2.5 h-2.5 rounded-full ${boardOnline ? "bg-emerald-500" : "bg-red-500"}`} />
                 </div>
                 <p className={`text-base font-bold mb-0.5 ${boardOnline ? "text-emerald-700" : "text-red-700"}`}>{boardOnline ? "Online" : "Offline"}</p>
-                <p className="text-[10px] text-slate-400 font-mono mb-2.5">ESP32-S3 · 192.168.1.45</p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2.5">ESP32-S3 · Rede Segura</p>
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -280,7 +315,7 @@ export default function Dashboard() {
                   <span className={`w-2.5 h-2.5 rounded-full ${mqttOk ? "bg-emerald-500" : "bg-amber-400"}`} />
                 </div>
                 <p className={`text-base font-bold mb-0.5 ${mqttOk ? "text-emerald-700" : "text-amber-700"}`}>{mqttOk ? "Conectado" : "Desconect."}</p>
-                <p className="text-[10px] text-slate-400 font-mono mb-2.5 truncate">broker.hivemq.com :1883</p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2.5 truncate">SSL/TLS 8883</p>
               </div>
 
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -309,7 +344,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* ── TANK (2fr) + COMMAND PANEL (1fr) ── */}
+            {/* ── TANK (2fr) E COMMAND PANEL (1fr) ── */}
             <div className="grid grid-cols-3 gap-4">
 
               {/* Tank visualization */}
@@ -344,82 +379,116 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* ── COMMAND PANEL (COM BLOQUEIO DE CARGO) ── */}
+              {/* ── COMMAND PANEL REFEITO (SLIDER, LIMITES E CANCELAR) ── */}
               <div className="col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
                 
-                {/* Overlay de Bloqueio Visual se for apenas visualização */}
+                {/* Overlay de Bloqueio Visual se for cargo Visualização */}
                 {isReadOnly && (
                   <div className="absolute inset-0 bg-slate-50/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center p-6 text-center border border-amber-100/50">
                     <div className="bg-amber-100 text-amber-700 p-3 rounded-full mb-3 shadow-sm border border-amber-200">
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7z" /></svg>
                     </div>
                     <span className="font-bold text-slate-800 text-sm mb-1">Acesso Restrito</span>
-                    <p className="text-[11px] text-slate-500 font-medium">O seu cargo de visualização não permite acionar bombas ou válvulas operacionais.</p>
+                    <p className="text-[11px] text-slate-500 font-medium">Seu cargo de visualização não permite acionar bombas ou válvulas.</p>
                   </div>
                 )}
 
                 <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
-                  <p className="font-bold text-slate-800 text-sm">Enviar Comando</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Controle manual do tanque</p>
+                  <p className="font-bold text-slate-800 text-sm">Painel de Operação</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Controle de Tarefas e Limites</p>
                 </div>
 
-                <div className="flex-1 flex flex-col gap-4 p-5">
-                  <div>
-                    <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Operação</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => setOperation("fill")} disabled={isReadOnly}
-                        className={`py-2.5 rounded-lg text-sm font-bold border transition-colors ${operation === "fill" ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/20" : "bg-slate-50 text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600"} disabled:opacity-50 disabled:pointer-events-none`}>
-                        ↑ Encher
-                      </button>
-                      <button onClick={() => setOperation("drain")} disabled={isReadOnly}
-                        className={`py-2.5 rounded-lg text-sm font-bold border transition-colors ${operation === "drain" ? "bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/20" : "bg-slate-50 text-slate-500 border-slate-200 hover:border-orange-300 hover:text-orange-500"} disabled:opacity-50 disabled:pointer-events-none`}>
-                        ↓ Esvaziar
-                      </button>
+                <div className="flex-1 flex flex-col p-5">
+                  
+                  {/* TABELINHA INFORMATIVA DE COTAS (Sempre visível) */}
+                  <div className="grid grid-cols-2 gap-2 text-[10px] mb-5">
+                    <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-2.5">
+                      <span className="block font-bold text-blue-800 mb-1.5 uppercase tracking-wide">↑ Encher</span>
+                      <div className="flex justify-between text-slate-500 mb-1"><span>Sua Cota:</span> <span>{isGestor ? 'Max' : `${limiteUserEncher}L`}</span></div>
+                      <div className="flex justify-between text-slate-500 mb-1"><span>Espaço Físico:</span> <span>{maxFisicoEncher.toFixed(1)}L</span></div>
+                      <div className="flex justify-between text-blue-700 font-bold border-t border-blue-100 mt-1.5 pt-1.5"><span>TETO MÁX:</span> <span>{maxPermitidoEncher.toFixed(1)}L</span></div>
+                    </div>
+                    <div className="bg-orange-50/50 border border-orange-100 rounded-lg p-2.5">
+                      <span className="block font-bold text-orange-800 mb-1.5 uppercase tracking-wide">↓ Esvaziar</span>
+                      <div className="flex justify-between text-slate-500 mb-1"><span>Sua Cota:</span> <span>{isGestor ? 'Max' : `${limiteUserEsvaziar}L`}</span></div>
+                      <div className="flex justify-between text-slate-500 mb-1"><span>Água Disp:</span> <span>{maxFisicoEsvaziar.toFixed(1)}L</span></div>
+                      <div className="flex justify-between text-orange-700 font-bold border-t border-orange-100 mt-1.5 pt-1.5"><span>PISO MÁX:</span> <span>{maxPermitidoEsvaziar.toFixed(1)}L</span></div>
                     </div>
                   </div>
 
-                  {(() => {
-                    const limiteEncher = Math.max(0, capacidadeMaxima - tankLevelLiters);
-                    const limiteEsvaziar = Math.max(0, tankLevelLiters);
-                    const limiteAtual = operation === "fill" ? limiteEncher : limiteEsvaziar;
-                    const maxSlider = limiteAtual < 0.1 ? 0.1 : limiteAtual; 
-                    const volumeSeguro = Math.min(volume, maxSlider);
-                    const isOpDisabled = limiteAtual < 0.1 || isReadOnly;
+                  {/* RENDERIZAÇÃO CONDICIONAL: OCUPADO vs LIVRE */}
+                  {busy ? (
+                    <div className="flex-1 flex flex-col items-center justify-center bg-red-50/50 rounded-xl border border-red-100 p-5 text-center animate-pulse">
+                      <div className="bg-red-100 p-3 rounded-full mb-3 text-red-600">
+                        <SpinIcon cls="w-6 h-6" />
+                      </div>
+                      <h3 className="text-red-800 font-bold text-sm mb-1">Sistema em Operação</h3>
+                      <p className="text-[11px] text-red-600/80 mb-5 leading-relaxed">Uma tarefa está sendo executada (Web ou Máquina Física).<br/>Aguarde o término ou force a parada.</p>
+                      
+                      <button
+                        onClick={() => sendCommand('PARAR', 0, authUser.matricula, authUser.nome)}
+                        disabled={!boardOnline || !mqttOk}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition-colors text-xs flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" /></svg>
+                        CANCELAR OPERAÇÃO AGORA
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col justify-between">
+                      {/* SLIDER INTERATIVO */}
+                      <div>
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Definir Novo Nível Alvo</span>
+                          <span className="text-xl font-bold text-slate-800">{alvoInput.toFixed(1)} <span className="text-xs text-slate-400 font-medium">L</span></span>
+                        </div>
+                        
+                        <input
+                          type="range"
+                          min={sliderMin}
+                          max={sliderMax}
+                          step="0.5"
+                          value={alvoInput}
+                          onPointerDown={() => setIsDragging(true)}
+                          onPointerUp={() => setIsDragging(false)}
+                          onChange={(e) => setAlvoInput(Number(e.target.value))}
+                          disabled={isReadOnly || !boardOnline}
+                          className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-700 disabled:opacity-50 hover:bg-slate-300 transition-colors"
+                        />
+                        
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-2 font-mono">
+                          <span className="text-orange-600">{sliderMin.toFixed(1)}</span>
+                          <span className="text-slate-700 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Atual: {tankLevelLiters.toFixed(1)}</span>
+                          <span className="text-blue-600">{sliderMax.toFixed(1)}</span>
+                        </div>
+                      </div>
 
-                    return (
-                      <>
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Volume (Litros)</span>
-                            <span className="text-[10px] text-slate-400 font-mono">máx {limiteAtual.toFixed(1)} L</span>
-                          </div>
-                          <div className="relative mb-2">
-                            <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 text-right font-mono text-sm font-bold text-slate-800 pr-8">
-                              {volumeSeguro.toFixed(1)}
-                            </div>
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">L</span>
-                          </div>
-                          <input type="range" min="0.1" max={maxSlider} step="0.1"
-                            value={volumeSeguro}
-                            onChange={(e) => setVolume(parseFloat(e.target.value))}
-                            disabled={isOpDisabled}
-                            className={`w-full ${isOpDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${operation === "fill" ? "accent-blue-600" : "accent-orange-500"}`} />
+                      {/* INDICADOR DE MODO & BOTÃO ENVIAR */}
+                      <div className="mt-6">
+                        <div className="mb-4">
+                          {delta > 0 && <div className="text-center p-2.5 bg-blue-50 text-blue-700 rounded-lg text-[11px] font-bold tracking-wide">Deseja ENCHER +{deltaAbsoluto.toFixed(1)} Litros</div>}
+                          {delta < 0 && <div className="text-center p-2.5 bg-orange-50 text-orange-700 rounded-lg text-[11px] font-bold tracking-wide">Deseja ESVAZIAR -{deltaAbsoluto.toFixed(1)} Litros</div>}
+                          {delta === 0 && <div className="text-center p-2.5 bg-slate-50 border border-slate-100 text-slate-500 rounded-lg text-[11px] font-medium tracking-wide">Deslize o seletor para uma nova tarefa.</div>}
                         </div>
 
                         <button 
                           onClick={() => {
-                            const acao = operation === "fill" ? "ENCHER" : "ESVAZIAR";
-                            sendCommand(acao, volumeSeguro);
+                            const acao = delta > 0 ? "ENCHER" : "ESVAZIAR";
+                            // A placa precisa receber a quantidade RELATIVA, não a absoluta!
+                            sendCommand(acao, deltaAbsoluto, authUser.matricula, authUser.nome);
                           }}
-                          disabled={busy || !boardOnline || !mqttOk || isOpDisabled || isReadOnly}
-                          className={`w-full py-3 font-bold text-sm rounded-xl text-white transition-all mt-4 flex items-center justify-center gap-2
+                          disabled={busy || !boardOnline || !mqttOk || delta === 0 || isReadOnly}
+                          className={`w-full py-3.5 font-bold text-sm rounded-xl text-white transition-all shadow-sm
                             disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none
-                            ${operation === "fill" ? "bg-blue-600 hover:bg-blue-700 active:bg-blue-800" : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700"}`}>
-                          {busy ? <><SpinIcon />{boardState === "filling" ? "Enchendo..." : "Esvaziando..."}</> : <>Enviar Comando</>}
+                            ${delta > 0 ? "bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-blue-600/30" : 
+                              delta < 0 ? "bg-orange-500 hover:bg-orange-600 active:bg-orange-700 shadow-orange-500/30" : 
+                              "bg-slate-300 text-slate-500"}`}
+                        >
+                          Enviar Comando p/ Máquina
                         </button>
-                      </>
-                    );
-                  })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

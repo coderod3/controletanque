@@ -1,20 +1,24 @@
 #include "GerenciadorMQTT.h"
 #include "Rede.h"
 #include "Config.h"
-#include <WiFiClient.h> // <--- Usando Cliente Wi-Fi Normal (Rápido)
+#include <WiFiClientSecure.h> // <--- Usando o Cliente com Criptografia SSL
 #include <PubSubClient.h>
 
-static WiFiClient espClient; // <--- Sem "Secure"
+static WiFiClientSecure espClient; 
 static PubSubClient mqttClient(espClient);
 GerenciadorMQTTAPI GerenciadorMQTT;
 
 void GerenciadorMQTTAPI::iniciar() {
+    // Comando mágico: Aceita a criptografia sem precisar instalar o certificado raiz manualmente
+    espClient.setInsecure(); 
+    
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(this->_callback);
     
-    mqttClient.setKeepAlive(10); 
+    // Tempo um pouco maior pois o SSL demora mais para responder
+    mqttClient.setKeepAlive(15); 
 
-    Serial.println("[MQTT] Servico inicializado (Modo Rapido sem SSL).");
+    Serial.println("[MQTT] Servico inicializado (Modo SEGURO SSL - Porta 8883).");
 }
 
 bool GerenciadorMQTTAPI::conectado() {
@@ -39,17 +43,17 @@ void GerenciadorMQTTAPI::processar() {
 
 void GerenciadorMQTTAPI::_tentarReconectar() {
     static unsigned long ultimaTentativa = 0;
-    if (millis() - ultimaTentativa < 5000) return;
+    if (millis() - ultimaTentativa < 7000) return; // Dá 7 segundos para o SSL negociar
     ultimaTentativa = millis();
 
-    Serial.print("[MQTT] Conectando ao Broker sem criptografia... ");
+    Serial.print("[MQTT] Conectando ao Broker Seguro... ");
     
     const char* lwtTopic = TOPIC_STATUS;
     const char* lwtMsg = "{\"status\": \"OFFLINE\"}";
 
-    // Conecta APENAS com o ID e o Testamento (LWT). Sem usuário e senha.
-    if (mqttClient.connect(MQTT_CLIENT_ID, lwtTopic, 0, true, lwtMsg)) {
-        Serial.println("OK! Instantâneo!");
+    // Agora passamos o Usuário e Senha definidos no Config.h
+    if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS, lwtTopic, 0, true, lwtMsg)) {
+        Serial.println("OK! Criptografia estabelecida.");
         
         mqttClient.publish(TOPIC_STATUS, "{\"status\": \"ONLINE\"}", true); 
         mqttClient.subscribe(TOPIC_COMANDO);

@@ -19,15 +19,17 @@
 
 enum EstadoSistema { ESPERANDO_RFID, MENU_AJUSTE, EXECUTANDO, SINCRONIZANDO };
 EstadoSistema estadoAtual = ESPERANDO_RFID;
+EstadoSistema estadoAnterior = ESPERANDO_RFID; // Para gatilho instantâneo de web
 
 float alvoVol = 0.0;
 unsigned long delayTelemetria = 0;
 unsigned long ts_animacao_sync = 0; 
 
 // --- VARIÁVEIS GLOBAIS DO SUB-MENU ---
-int subMenu = 0;         // 0: Escolher Ação, 1: Escolher Quantidade
-int acaoSelecionada = 1; // 1: Encher, -1: Esvaziar
-float quantidadeL = 0.0; // Quantidade de Litros a adicionar/remover
+int subMenu = 0;         
+int acaoSelecionada = 1; 
+float quantidadeL = 0.0; 
+unsigned long ts_ultimo_interacao = 0; // Timeout de inatividade
 
 // --- VARIÁVEIS GLOBAIS DE TRACING ---
 unsigned long ts_recebido = 0;
@@ -37,6 +39,29 @@ String ctx_origem = "";
 String ctx_usuario = "";
 float ctx_lim_encher = 100.0;
 float ctx_lim_esvaziar = 100.0;
+
+// =========================================================================
+// FUNÇÃO DE ESPELHAMENTO INSTANTÂNEO PARA O SITE (Vercel/Zustand)
+// =========================================================================
+void espelharEstadoWeb() {
+    float v = Sensor.lerLitros();
+    String s = "idle";
+    
+    if (estadoAtual == EXECUTANDO) {
+        if (ControleNivel.getAlvo() > v) s = "filling";
+        else s = "draining";
+    } 
+    else if (estadoAtual == MENU_AJUSTE) {
+        s = "menu"; // Trava o ControlPanel no site
+    } 
+    else if (estadoAtual == SINCRONIZANDO) {
+        s = "ocupado";
+    }
+    
+    String json = "{\"nivel\":" + String(v, 1) + ",\"estado\":\"" + s + "\"}";
+    Rede.enviar(TOPIC_TELEMETRIA, json);
+    delayTelemetria = millis(); // Reseta o loop de 2s para evitar spam
+}
 
 void setup() {
     Serial.begin(115200);
@@ -64,7 +89,7 @@ void setup() {
 
 void loop() {
     // ---------------------------------------------------------
-    // 0. SINCRONIZAÇÃO E TELEMETRIA
+    // 0. SINCRONIZAÇÃO E TELEMETRIA (Core 0/1)
     // ---------------------------------------------------------
     Comandos.monitorar();
 
@@ -96,19 +121,20 @@ void loop() {
     float volAtual = Sensor.lerLitros();
     ComandoBotao btn = Botoes.ler();
 
+    // Renova o tempo de sessão se houver interação física
+    if (btn != NENHUM) {
+        ts_ultimo_interacao = millis();
+    }
+
+    // GATILHO INSTANTÂNEO: Se mudou de estado, avisa a web no mesmo milissegundo!
+    if (estadoAtual != estadoAnterior) {
+        espelharEstadoWeb();
+        estadoAnterior = estadoAtual;
+    }
+
+    // TELEMETRIA DE ROTINA: Atualiza a cada 2 segundos
     if (millis() - delayTelemetria > 2000) {
-        String statusStr = "idle";
-        if (estadoAtual == EXECUTANDO) {
-            if (bombaEnchendo) statusStr = "filling";
-            else if (bombaEsvaziando) statusStr = "draining";
-        } 
-        else if (estadoAtual == SINCRONIZANDO) {
-            statusStr = "ocupado"; 
-        }
-        
-        String json = "{\"nivel\":" + String(volAtual, 1) + ",\"estado\":\"" + statusStr + "\"}";
-        Rede.enviar(TOPIC_TELEMETRIA, json);
-        delayTelemetria = millis();
+        espelharEstadoWeb();
     }
 
     // ---------------------------------------------------------
@@ -140,27 +166,26 @@ void loop() {
                 String uidLido = LeitorRFID.lerTag();
                 if (uidLido != "") {
                     String nomeUser;
-                    // Recebe as cotas offline na hora da leitura!
                     if (Usuarios.autenticar(uidLido, nomeUser, ctx_lim_encher, ctx_lim_esvaziar)) {                        
                         ctx_origem = "LOCAL_RFID";
                         ctx_usuario = nomeUser;
                         ts_recebido = millis(); 
+                        ts_ultimo_interacao = millis(); // Inicia a sessão de 10s
 
                         String saudacao = "OLA, " + nomeUser.substring(0, 11);
                         Tela.atualizar(saudacao, "ACESSO LIBERADO ");
                         Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
                         delay(1500);
                         
-                        // Prepara as variáveis para o Menu Interativo
                         estadoAtual = MENU_AJUSTE;
                         subMenu = 0;
                         acaoSelecionada = 1;
-                        quantidadeL = 5.0; // Inicia sugerindo 5L
+                        quantidadeL = 5.0; 
 
                         Tela.limpar();
                     } else {
                         Tela.atualizar("  TAG INVALIDA  ", uidLido.substring(0, 16));
-                        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Tentativa de acesso negada: " + uidLido + "\"}");
+                        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Tentativa de acesso negada: " + uidLido + "\", \"tipo\": \"error\"}");
                         delay(1500);
                     }
                 }
@@ -168,6 +193,16 @@ void loop() {
             break;
 
         case MENU_AJUSTE:
+            // ----------------------------------------------------
+            // GESTÃO DE SESSÃO: TIMEOUT DE 10 SEGUNDOS
+            // ----------------------------------------------------
+            if (millis() - ts_ultimo_interacao > 10000) {
+                estadoAtual = ESPERANDO_RFID;
+                Tela.limpar();
+                Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Sessao encerrada por inatividade (10s).\", \"tipo\": \"warning\"}");
+                break; // IMPORTANTE: Pula todo o resto do código e volta pro inicio
+            }
+
             // ----------------------------------------------------
             // ETAPA 1: ESCOLHER A AÇÃO
             // ----------------------------------------------------
@@ -183,41 +218,33 @@ void loop() {
                 }
 
                 if (btn == CONFIRMA) {
-                    subMenu = 1; // Avança para a Etapa 2
+                    subMenu = 1; 
                     quantidadeL = 5.0; 
                     Tela.limpar();
                 }
             } 
             // ----------------------------------------------------
-            // ETAPA 2: ESCOLHER A QUANTIDADE (COM TRAVAS)
+            // ETAPA 2: ESCOLHER A QUANTIDADE
             // ----------------------------------------------------
             else if (subMenu == 1) {
-                // 1. Calcula qual é a cota aplicável a esta ação
                 float limiteCota = (acaoSelecionada == 1) ? ctx_lim_encher : ctx_lim_esvaziar;
-                
-                // 2. Calcula qual é o limite físico do tanque no momento
                 float limiteFisico = (acaoSelecionada == 1) ? (Parametros.getTankMaxVolume() - volAtual) : volAtual;
                 
-                // 3. A restrição Real é SEMPRE o menor dos dois!
                 float limiteReal = limiteCota;
                 if (limiteFisico < limiteCota) limiteReal = limiteFisico;
                 if (limiteReal < 0.0f) limiteReal = 0.0f;
 
-                // 4. Interação do usuário
                 if (btn == MAIS)  quantidadeL += 5.0;
                 if (btn == MENOS) quantidadeL -= 5.0;
 
-                // 5. TRAVA RIGOROSA (Impede passar do teto ou cair abaixo de zero)
                 quantidadeL = constrain(quantidadeL, 0.0f, limiteReal);
 
-                // 6. Atualização visual no display
                 String l1 = (acaoSelecionada == 1) ? "ENCHER QUANTO?" : "ESVAZIAR QUANTO?";
                 String l2 = String(quantidadeL, 0) + " L (Max:" + String(limiteReal, 0) + ")";
-                while(l2.length() < 16) l2 += " "; // Padding para limpar artefatos
+                while(l2.length() < 16) l2 += " "; 
                 
                 Tela.atualizar(l1, l2.substring(0, 16));
 
-                // 7. Confirmação Final e Início da Bomba
                 if (btn == CONFIRMA) {
                     if (quantidadeL > 0) {
                         alvoVol = volAtual + (acaoSelecionada * quantidadeL);
@@ -229,7 +256,6 @@ void loop() {
                         estadoAtual = EXECUTANDO;
                         Tela.limpar();
                     } else {
-                        // Se o usuário confirmar com "0 Litros", ele desiste e volta
                         estadoAtual = ESPERANDO_RFID;
                         Tela.limpar();
                     }
@@ -251,7 +277,14 @@ void loop() {
                 Tela.atualizar(l1, l2);
             }
 
+            // O Kill Switch e Fim de Operação juntos
             if (!ControleNivel.estaTrabalhando() || btn == CONFIRMA) {
+                
+                // Se foi interrompido fisicamente pelo botão (Kill Switch)
+                if (btn == CONFIRMA) {
+                    Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Operacao interrompida manualmente na placa!\", \"tipo\": \"error\"}");
+                }
+
                 ControleNivel.parar();
                 estadoAtual = ESPERANDO_RFID; 
                 Tela.limpar();
