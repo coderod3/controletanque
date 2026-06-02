@@ -5,12 +5,12 @@
 #include "Sensor.h"
 #include "Usuarios.h"
 #include "Parametros.h" 
-#include "Config.h" // Traz os tópicos globais
+#include "Config.h" 
 
 ComandosAPI Comandos;
 
 void ComandosAPI::iniciar() {
-    Parametros.iniciar(); // Inicia os parâmetros primeiro
+    Parametros.iniciar(); 
     Serial.println("[Comandos] Interprete de mensagens pronto.");
 }
 
@@ -41,7 +41,6 @@ void ComandosAPI::_processar(String json) {
             float volumeAtual = Sensor.lerLitros();
             float alvoFinal = (acao == "ENCHER") ? volumeAtual + delta : volumeAtual - delta;
             
-            // Usa as travas diretamente da Memória/Config
             float maxVol = Parametros.getTankMaxVolume();
             if (alvoFinal > maxVol) alvoFinal = maxVol; 
             if (alvoFinal < 0.0f) alvoFinal = 0.0f; 
@@ -50,71 +49,53 @@ void ComandosAPI::_processar(String json) {
             
             char logMsg[100];
             snprintf(logMsg, sizeof(logMsg), "{\"msg\": \"Operacao %s aceita. Alvo calculado: %.1f L\"}", acao.c_str(), alvoFinal);
-            Rede.enviar(TOPIC_LOGS, logMsg); // VARIÁVEL
+            Rede.enviar(TOPIC_LOGS, logMsg); 
         }
     } 
     else if (acao == "PARAR") {
         ControleNivel.parar();
-        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Emergencia: Sistema parado via WEB\"}"); // VARIÁVEL
+        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Emergencia: Sistema parado via WEB\"}");
     }
     
     // 2. PARÂMETROS E HANDSHAKE
     else if (acao == "GET_SYNC") {
-        Rede.enviar(TOPIC_PARAMETROS, Parametros.obterJsonCompleto()); // VARIÁVEL
-        Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
+        Rede.enviar(TOPIC_PARAMETROS, Parametros.obterJsonCompleto());
+        Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista());
     }
     else if (acao == "SET_PARAM") {
         JsonObject data = doc["payload"];
         Parametros.atualizarDoJson(doc); 
-        Rede.enviar(TOPIC_PARAMETROS, Parametros.obterJsonCompleto()); // VARIÁVEL
-        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Parametros de engenharia atualizados remotamente\"}"); // VARIÁVEL
-        pendenteSync = true; // <--- AVISA A MAIN PARA PISCAR A TELA
+        Rede.enviar(TOPIC_PARAMETROS, Parametros.obterJsonCompleto());
+        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Parametros de engenharia atualizados remotamente\"}");
+        pendenteSync = true; 
     }
     
-    // 3. GERENCIAMENTO DE USUÁRIOS (CRUD) - Bloco 1
+    // 3. GERENCIAMENTO DE USUÁRIOS (CRUD)
     else if (acao == "SYNC_USER") {
         String uid = doc["uid"] | "";
         String nome = doc["nome"] | "Usuario";
+        // Captura os limites vindos do Payload MQTT
+        float l_encher = doc["limite_encher"] | 100.0f;
+        float l_esvaziar = doc["limite_esvaziar"] | 100.0f;
+        
         if (uid != "") {
-            Usuarios.salvar(uid, nome);
-            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
-            pendenteSync = true; // <--- AVISA A MAIN
+            Usuarios.salvar(uid, nome, l_encher, l_esvaziar);
+            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); 
+            pendenteSync = true; 
         }
     }
     else if (acao == "DEL_USER") {
         String uid = doc["uid"] | "";
         if (uid != "") {
             Usuarios.remover(uid);
-            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
-            pendenteSync = true; // <--- AVISA A MAIN
+            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista());
+            pendenteSync = true; 
         }
     }
     else if (acao == "LIMPAR_MEMORIA") {
         Usuarios.limpar();
-        Rede.enviar(TOPIC_USUARIOS, "[]"); // VARIÁVEL
-        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Memoria de usuarios formatada\"}"); // VARIÁVEL
-        pendenteSync = true; // <--- AVISA A MAIN
-    }
-
-    // 3. GERENCIAMENTO DE USUÁRIOS (CRUD) - Bloco 2
-    else if (acao == "SYNC_USER") {
-        String uid = doc["uid"] | "";
-        String nome = doc["nome"] | "Usuario";
-        if (uid != "") {
-            Usuarios.salvar(uid, nome);
-            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
-        }
-    }
-    else if (acao == "DEL_USER") {
-        String uid = doc["uid"] | "";
-        if (uid != "") {
-            Usuarios.remover(uid);
-            Rede.enviar(TOPIC_USUARIOS, Usuarios.obterJsonLista()); // VARIÁVEL
-        }
-    }
-    else if (acao == "LIMPAR_MEMORIA") {
-        Usuarios.limpar();
-        Rede.enviar(TOPIC_USUARIOS, "[]"); // VARIÁVEL
-        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Memoria de usuarios formatada\"}"); // VARIÁVEL
+        Rede.enviar(TOPIC_USUARIOS, "[]"); 
+        Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Memoria de usuarios formatada\"}");
+        pendenteSync = true; 
     }
 }

@@ -9,12 +9,15 @@ export default function ControlPanel() {
   // 2. Estado Global (Seletor Estrito): Otimiza a performance ignorando mudanças de "volume"
   const isSending = useTankStore((state) => state.isSending);
   const commandFeedback = useTankStore((state) => state.commandFeedback);
-  const isOnline = useTankStore((state) => state.connectionStatus) === 'connected';
-
+  const setCommandFeedback = useTankStore((state) => state.setCommandFeedback);
+  const isOnline = useTankStore((state) => state.connectionStatus) === 'connected' || useTankStore((state) => state.boardOnline);
+  
   // 3. Handlers de Controle
   const handleAcao = (acao) => {
-    // Validação de segurança dupla
-    if (!isOnline) return;
+    if (!isOnline) {
+      setCommandFeedback('Erro: A placa está Offline.');
+      return;
+    }
     
     let valorAlvo = -1;
     if (acao === 'ENCHER' || acao === 'ESVAZIAR') {
@@ -23,8 +26,24 @@ export default function ControlPanel() {
       if (valorAlvo > 100) valorAlvo = 100;
     }
 
-    // Dispara o comando (Fire and Forget - a Store cuida do resto)
-    sendCommand(acao, valorAlvo);
+    // Pega as permissões do usuário logado no navegador
+    const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+    const role = localStorage.getItem('userRole') || authUser.setor;
+
+    // VALIDAÇÃO DE LIMITES (Gestores pulam a regra)
+    if (role !== 'gestor' && role !== 'Gestão') {
+      if (acao === 'ENCHER' && valorAlvo > (authUser.limite_encher || 0)) {
+        setCommandFeedback(`Acesso Negado: Seu limite para encher é de no máximo ${authUser.limite_encher}L.`);
+        return; 
+      }
+      if (acao === 'ESVAZIAR' && valorAlvo > (authUser.limite_esvaziar || 0)) {
+        setCommandFeedback(`Acesso Negado: Seu limite para esvaziar é de no máximo ${authUser.limite_esvaziar}L.`);
+        return;
+      }
+    }
+
+    setCommandFeedback('Aguardando confirmação da máquina...');
+    sendCommand(acao, valorAlvo, authUser.matricula, authUser.nome);
   };
 
   return (
@@ -82,7 +101,7 @@ export default function ControlPanel() {
       {/* Feedback do Sistema (Timeout ou Confirmação) */}
       {commandFeedback && (
         <div className={`mt-4 p-3 rounded text-sm font-medium text-center ${
-          commandFeedback.includes('Erro') || commandFeedback.includes('Timeout')
+          commandFeedback.includes('Erro') || commandFeedback.includes('Timeout') || commandFeedback.includes('Negado')
             ? 'bg-red-100 text-red-700'
             : commandFeedback.includes('Aguardando')
             ? 'bg-yellow-100 text-yellow-700 animate-pulse'

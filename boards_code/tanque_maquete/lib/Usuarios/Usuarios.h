@@ -12,12 +12,13 @@ private:
 
 public:
     void iniciar();
-    void salvar(String uid, String nome);
+    // Agora recebe e grava os limites físicos
+    void salvar(String uid, String nome, float lim_encher, float lim_esvaziar);
     void remover(String uid);
-    bool autenticar(String uid, String &nomeOut);
+    // Retorna os limites por referência para a main usar
+    bool autenticar(String uid, String &nomeOut, float &lim_encher, float &lim_esvaziar);
     void limpar();
     
-    // Retorna todos os usuários em formato JSON para o Dashboard
     String obterJsonLista();
 };
 

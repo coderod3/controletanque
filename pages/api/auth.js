@@ -43,13 +43,20 @@ export default async function handler(req, res) {
     }
 
     console.log(`[AUTH API] Sucesso. Cargo definido: ${userRole}`);
-
+    
     return res.status(200).json({ 
       message: 'Autenticado com sucesso',
       role: userRole,
-      user: { nome: user.nome, setor: user.setor }
+      user: { 
+        nome: user.nome, 
+        setor: user.setor,
+        matricula: user.matricula,
+        // Envia os limites do banco para o navegador
+        limite_encher: parseFloat(user.limite_encher) || 0,
+        limite_esvaziar: parseFloat(user.limite_esvaziar) || 0
+      }
     });
-
+    
   } catch (error) {
     console.error('[AUTH API] Erro fatal no servidor:', error);
     return res.status(500).json({ message: 'Erro interno do servidor.' });

@@ -41,18 +41,31 @@ export default function Config() {
   };
 
   // Funções de Disparo MQTT
+  // Funções de Disparo MQTT
   const handleSync = () => {
     sendCommand("GET_SYNC");
     setHasChanges(false);
+    useTankStore.getState().addLog({ tipo: 'info', fonte: 'SISTEMA', msg: 'Solicitando parâmetros da placa...' });
   };
 
   const handleSave = () => {
-    sendCommand("SET_PARAM", -1, "", "", { payload: displayParams });
+    // Converte os textos do form para Numéricos Puros
+    const numericParams = {};
+    for (let key in displayParams) {
+        numericParams[key] = Number(displayParams[key]);
+    }
+    
+    // ATENÇÃO AQUI: Nós enviamos numericParams "solto" como quinto argumento,
+    // sem embrulhar em { payload: ... } para casar com a leitura do C++
+    sendCommand("SET_PARAM", -1, "WEB", "Admin", numericParams);
+    
     setHasChanges(false);
+    useTankStore.getState().addLog({ tipo: 'success', fonte: 'WEB', msg: 'Parâmetros enviados e gravados na Flash com sucesso.' });
   };
 
   const handleFormatNVS = () => {
-    if (window.confirm("Aviso: Esta ação apagará permanentemente todos os cartões RFID da memória da placa. Continuar?")) {
+    // Usamos confirm nativo apenas para proteção extrema de sistema
+    if (window.confirm("Aviso: Esta ação apagará permanentemente todos os cartões RFID da placa. Continuar?")) {
       sendCommand("LIMPAR_MEMORIA");
     }
   };

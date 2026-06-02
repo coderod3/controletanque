@@ -1,6 +1,14 @@
 import { sql } from '@vercel/postgres';
 
 export default async function handler(req, res) {
+  if (req.method === 'GET') {
+    try {
+      const result = await sql`SELECT * FROM usuarios ORDER BY id DESC`;
+      return res.status(200).json({ data: result.rows });
+    } catch (error) {
+      return res.status(500).json({ error: 'Erro ao buscar usuários do banco.' });
+    }
+  }
   if (req.method === 'POST') {
     const { matricula, nome, email, setor, rfid_id, limite_encher, limite_esvaziar } = req.body;
     const tag = rfid_id.trim() === '' ? null : rfid_id.toUpperCase();

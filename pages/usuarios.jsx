@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { sql } from '@vercel/postgres';
 import { useTankStore } from '../store/useTankStore';
 import Sidebar from '../components/Sidebar';
+import { sendCommand } from '../lib/mqttService';
 
 export default function GestaoUsuarios({ usuariosIniciais }) {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function GestaoUsuarios({ usuariosIniciais }) {
     });
     setIsModalOpen(true);
   };
-
+  
   const handleSalvarUsuario = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -61,15 +62,45 @@ export default function GestaoUsuarios({ usuariosIniciais }) {
     setIsSubmitting(false);
 
     if (res.ok) {
+      // Sincroniza a placa em tempo real para QUALQUER alteração ou adição
+      if (formUsuario.rfid_id && formUsuario.rfid_id.trim() !== '') {
+        const tagLimpa = formUsuario.rfid_id.trim().toUpperCase();
+        // COMO ERA: sendCommand('SYNC_USER', -1, tagLimpa, formUsuario.nome);
+        // COMO FICA AGORA:
+        sendCommand('SYNC_USER', -1, tagLimpa, formUsuario.nome, {
+            limite_encher: parseFloat(formUsuario.limite_encher) || 0,
+            limite_esvaziar: parseFloat(formUsuario.limite_esvaziar) || 0
+        });        
+        
+        // Loga sucesso no painel
+        useTankStore.getState().addLog({ 
+          tipo: 'success', 
+          fonte: 'SISTEMA', 
+          msg: `Acesso sincronizado na placa para: ${formUsuario.nome}` 
+        });
+      }
+
       setIsModalOpen(false);
       router.replace(router.asPath); 
     } else {
-      alert('Erro ao salvar. Verifique se os dados estão corretos ou se já existem.');
+      // 🚫 SEM ALERT: Exibe o erro no terminal de logs do sistema
+      useTankStore.getState().addLog({ 
+        tipo: 'error', 
+        fonte: 'SISTEMA', 
+        msg: 'Erro ao salvar. Verifique se a matrícula ou Tag já estão em uso.' 
+      });
+      setIsModalOpen(false);
     }
   };
 
   const handleDeletarUsuario = async (id) => {
+    // O confirm() aqui é mantido porque é uma barreira de segurança vital antes de deletar dados críticos,
+    // diferente de um aviso de erro, que agora vai para os logs.
     if (confirm('Tem certeza que deseja excluir este usuário? O acesso dele será revogado imediatamente.')) {
+      
+      // Encontra o usuário na lista ANTES de deletar para resgatar o RFID dele
+      const user = usuariosIniciais.find(u => u.id === id);
+
       const res = await fetch('/api/usuarios', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -77,7 +108,22 @@ export default function GestaoUsuarios({ usuariosIniciais }) {
       });
 
       if (res.ok) {
+        // Se tinha RFID, expulsa da memória da placa na mesma hora
+        if (user && user.rfid_id) {
+          sendCommand('DEL_USER', -1, user.rfid_id.toUpperCase());
+          useTankStore.getState().addLog({ 
+            tipo: 'info', 
+            fonte: 'SISTEMA', 
+            msg: `Acesso físico (Tag) revogado para: ${user.nome}` 
+          });
+        }
         router.replace(router.asPath); 
+      } else {
+        useTankStore.getState().addLog({ 
+          tipo: 'error', 
+          fonte: 'SISTEMA', 
+          msg: 'Falha de comunicação ao excluir usuário do banco de dados.' 
+        });
       }
     }
   };

@@ -11,19 +11,23 @@
 #include "LeitorRFID.h"
 
 // Novos Módulos de Integração
-#include "Rede.h"      // Orquestrador do Core 0
-#include "Usuarios.h"  // Banco de dados local na Flash
-#include "Comandos.h"  // Intérprete de mensagens MQTT
-#include "Auditoria.h" // Adicione nos includes
+#include "Rede.h"      
+#include "Usuarios.h"  
+#include "Comandos.h"  
+#include "Auditoria.h" 
+#include "Parametros.h"
 
-// --- NOVO ESTADO "SINCRONIZANDO" ADICIONADO ---
 enum EstadoSistema { ESPERANDO_RFID, MENU_AJUSTE, EXECUTANDO, SINCRONIZANDO };
 EstadoSistema estadoAtual = ESPERANDO_RFID;
 
 float alvoVol = 0.0;
-bool menuIniciado = false;
 unsigned long delayTelemetria = 0;
-unsigned long ts_animacao_sync = 0; // Temporizador para o delay da tela
+unsigned long ts_animacao_sync = 0; 
+
+// --- VARIÁVEIS GLOBAIS DO SUB-MENU ---
+int subMenu = 0;         // 0: Escolher Ação, 1: Escolher Quantidade
+int acaoSelecionada = 1; // 1: Encher, -1: Esvaziar
+float quantidadeL = 0.0; // Quantidade de Litros a adicionar/remover
 
 // --- VARIÁVEIS GLOBAIS DE TRACING ---
 unsigned long ts_recebido = 0;
@@ -31,17 +35,17 @@ unsigned long ts_inicio = 0;
 float vol_inicial_tarefa = 0.0;
 String ctx_origem = "";
 String ctx_usuario = "";
+float ctx_lim_encher = 100.0;
+float ctx_lim_esvaziar = 100.0;
 
 void setup() {
     Serial.begin(115200);
     Serial.println("\n--- NEXUS OS | INICIALIZANDO ---");
     
-    // 1. Inicializa Infraestrutura de Rede (Dispara o Core 0)
     Rede.iniciar();
     Usuarios.iniciar();
     Auditoria.iniciar(); 
     
-    // 2. Inicializa Hardware e Lógica (Core 1)
     Sensor.iniciar();
     Bombas.iniciar();
     Botoes.iniciar();
@@ -50,7 +54,6 @@ void setup() {
     LeitorRFID.iniciar();
     Comandos.iniciar();
 
-    // 3. Configuração de Periféricos
     pinMode(PIN_LED_R, OUTPUT);
     pinMode(PIN_LED_G, OUTPUT);
     pinMode(PIN_LED_B, OUTPUT);
@@ -65,24 +68,16 @@ void loop() {
     // ---------------------------------------------------------
     Comandos.monitorar();
 
-    // INTERCEPTADOR DE SYNC: Se comandos gravou algo na Flash
     if (Comandos.pendenteSync) {
-        Comandos.pendenteSync = false; // Consome a notificação
-        
-        // Parada de segurança: Não altera parâmetros críticos com bombas ligadas
-        if (estadoAtual == EXECUTANDO) {
-            ControleNivel.parar(); 
-        }
+        Comandos.pendenteSync = false; 
+        if (estadoAtual == EXECUTANDO) ControleNivel.parar(); 
         
         estadoAtual = SINCRONIZANDO;
         ts_animacao_sync = millis();
         Tela.limpar();
     }
 
-    // Intercepta comandos vindos da Web para forçar o estado de Execução
     if (ControleNivel.estaTrabalhando() && estadoAtual != EXECUTANDO && estadoAtual != SINCRONIZANDO) {
-        
-        // Se a origem estiver vazia, significa que o comando veio do MQTT (Web)
         if (ctx_origem == "") {
             ctx_origem = "WEB_DASHBOARD";
             ctx_usuario = "OPERADOR_WEB"; 
@@ -90,8 +85,6 @@ void loop() {
         }
 
         estadoAtual = EXECUTANDO;
-        menuIniciado = false; 
-        
         ts_inicio = millis();
         vol_inicial_tarefa = Sensor.lerLitros();
     }
@@ -103,16 +96,14 @@ void loop() {
     float volAtual = Sensor.lerLitros();
     ComandoBotao btn = Botoes.ler();
 
-    // Envia telemetria para o site a cada 2 segundos
     if (millis() - delayTelemetria > 2000) {
-        
         String statusStr = "idle";
         if (estadoAtual == EXECUTANDO) {
             if (bombaEnchendo) statusStr = "filling";
             else if (bombaEsvaziando) statusStr = "draining";
         } 
         else if (estadoAtual == SINCRONIZANDO) {
-            statusStr = "ocupado"; // Diz pro site que estamos regravando memória
+            statusStr = "ocupado"; 
         }
         
         String json = "{\"nivel\":" + String(volAtual, 1) + ",\"estado\":\"" + statusStr + "\"}";
@@ -126,12 +117,10 @@ void loop() {
     switch (estadoAtual) {
         
         case SINCRONIZANDO:
-            // LED Ciano (Azul + Verde) indicando operação de Memória
             analogWrite(PIN_LED_R, 0);
             analogWrite(PIN_LED_G, 255);
             analogWrite(PIN_LED_B, 255);
 
-            // Temporizador da Animação (Mostra na tela por 3 segundos no total)
             if (millis() - ts_animacao_sync < 1500) {
                 Tela.atualizar(" GRAVANDO NVS.. ", " AGUARDE O SYNC ");
             } 
@@ -140,7 +129,7 @@ void loop() {
             } 
             else {
                 Tela.limpar();
-                estadoAtual = ESPERANDO_RFID; // Retorna ao repouso
+                estadoAtual = ESPERANDO_RFID; 
             }
             break;
 
@@ -151,7 +140,8 @@ void loop() {
                 String uidLido = LeitorRFID.lerTag();
                 if (uidLido != "") {
                     String nomeUser;
-                    if (Usuarios.autenticar(uidLido, nomeUser)) {
+                    // Recebe as cotas offline na hora da leitura!
+                    if (Usuarios.autenticar(uidLido, nomeUser, ctx_lim_encher, ctx_lim_esvaziar)) {                        
                         ctx_origem = "LOCAL_RFID";
                         ctx_usuario = nomeUser;
                         ts_recebido = millis(); 
@@ -160,8 +150,13 @@ void loop() {
                         Tela.atualizar(saudacao, "ACESSO LIBERADO ");
                         Rede.enviar(TOPIC_LOGS, "{\"msg\": \"Acesso local por " + nomeUser + "\"}");
                         delay(1500);
+                        
+                        // Prepara as variáveis para o Menu Interativo
                         estadoAtual = MENU_AJUSTE;
-                        menuIniciado = false;
+                        subMenu = 0;
+                        acaoSelecionada = 1;
+                        quantidadeL = 5.0; // Inicia sugerindo 5L
+
                         Tela.limpar();
                     } else {
                         Tela.atualizar("  TAG INVALIDA  ", uidLido.substring(0, 16));
@@ -173,26 +168,72 @@ void loop() {
             break;
 
         case MENU_AJUSTE:
-            if (!menuIniciado) {
-                alvoVol = round(volAtual / 5.0) * 5.0; 
-                alvoVol = constrain(alvoVol, 0.0, 100.0);
-                menuIniciado = true;
-            }
+            // ----------------------------------------------------
+            // ETAPA 1: ESCOLHER A AÇÃO
+            // ----------------------------------------------------
+            if (subMenu == 0) {
+                if (btn == MAIS || btn == MENOS) {
+                    acaoSelecionada = (acaoSelecionada == 1) ? -1 : 1;
+                }
 
-            {
-                String linhaAlvo = "ALVO: " + String(alvoVol, 0) + " L";
-                while(linhaAlvo.length() < 16) linhaAlvo += " ";
-                Tela.atualizar("  AJUSTAR ALVO  ", linhaAlvo);
-            }
-            
-            if (btn == MAIS)  alvoVol += 5.0;
-            if (btn == MENOS) alvoVol -= 5.0;
-            alvoVol = constrain(alvoVol, 0.0, 100.0);
+                if (acaoSelecionada == 1) {
+                    Tela.atualizar("> 1. ENCHER     ", "  2. ESVAZIAR   ");
+                } else {
+                    Tela.atualizar("  1. ENCHER     ", "> 2. ESVAZIAR   ");
+                }
 
-            if (btn == CONFIRMA) { 
-                ControleNivel.setarAlvo(alvoVol);
-                estadoAtual = EXECUTANDO;
-                Tela.limpar();
+                if (btn == CONFIRMA) {
+                    subMenu = 1; // Avança para a Etapa 2
+                    quantidadeL = 5.0; 
+                    Tela.limpar();
+                }
+            } 
+            // ----------------------------------------------------
+            // ETAPA 2: ESCOLHER A QUANTIDADE (COM TRAVAS)
+            // ----------------------------------------------------
+            else if (subMenu == 1) {
+                // 1. Calcula qual é a cota aplicável a esta ação
+                float limiteCota = (acaoSelecionada == 1) ? ctx_lim_encher : ctx_lim_esvaziar;
+                
+                // 2. Calcula qual é o limite físico do tanque no momento
+                float limiteFisico = (acaoSelecionada == 1) ? (Parametros.getTankMaxVolume() - volAtual) : volAtual;
+                
+                // 3. A restrição Real é SEMPRE o menor dos dois!
+                float limiteReal = limiteCota;
+                if (limiteFisico < limiteCota) limiteReal = limiteFisico;
+                if (limiteReal < 0.0f) limiteReal = 0.0f;
+
+                // 4. Interação do usuário
+                if (btn == MAIS)  quantidadeL += 5.0;
+                if (btn == MENOS) quantidadeL -= 5.0;
+
+                // 5. TRAVA RIGOROSA (Impede passar do teto ou cair abaixo de zero)
+                quantidadeL = constrain(quantidadeL, 0.0f, limiteReal);
+
+                // 6. Atualização visual no display
+                String l1 = (acaoSelecionada == 1) ? "ENCHER QUANTO?" : "ESVAZIAR QUANTO?";
+                String l2 = String(quantidadeL, 0) + " L (Max:" + String(limiteReal, 0) + ")";
+                while(l2.length() < 16) l2 += " "; // Padding para limpar artefatos
+                
+                Tela.atualizar(l1, l2.substring(0, 16));
+
+                // 7. Confirmação Final e Início da Bomba
+                if (btn == CONFIRMA) {
+                    if (quantidadeL > 0) {
+                        alvoVol = volAtual + (acaoSelecionada * quantidadeL);
+                        ControleNivel.setarAlvo(alvoVol);
+                        
+                        vol_inicial_tarefa = volAtual;
+                        ts_inicio = millis();
+                        
+                        estadoAtual = EXECUTANDO;
+                        Tela.limpar();
+                    } else {
+                        // Se o usuário confirmar com "0 Litros", ele desiste e volta
+                        estadoAtual = ESPERANDO_RFID;
+                        Tela.limpar();
+                    }
+                }
             }
             break;
 
@@ -251,14 +292,12 @@ void loop() {
                 ctx_origem = "";
                 ctx_usuario = "";
             }
-
             break;
     }
 
     // ---------------------------------------------------------
     // 2. FEEDBACK VISUAL (LED RGB PWM)
     // ---------------------------------------------------------
-    // Se estiver sincronizando, o LED Ciano já tomou conta acima
     if (estadoAtual != SINCRONIZANDO) {
         if (bombaEnchendo) {
             analogWrite(PIN_LED_R, 0);

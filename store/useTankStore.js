@@ -20,7 +20,7 @@ export const useTankStore = create((set, get) => ({
   lastUpdate: null,
 
   logs: [],
-
+commandFeedback: null, // <--- NOVO: Variável para mensagens na UI
   // ==========================================
   // ACTIONS
   // ==========================================
@@ -29,7 +29,13 @@ export const useTankStore = create((set, get) => ({
 
   setMqttOk: (status) => set({ mqttOk: status }),
   setBoardOnline: (status) => set({ boardOnline: status }),
-
+  
+  // NOVO: Setter para mensagens na UI sem usar alert()
+  setCommandFeedback: (msg) => {
+    set({ commandFeedback: msg });
+    // Limpa a mensagem após 5 segundos
+    if (msg) setTimeout(() => set({ commandFeedback: null }), 5000);
+  },
   setTelemetry: (vol, status) => set((state) => ({
     volume: Number(vol) || 0,
     operationStatus: typeof status === 'string' ? status.toLowerCase() : 'unknown',
@@ -66,6 +72,7 @@ export const useTankStore = create((set, get) => ({
     targetVolume: 0,
     operationStatus: 'idle',
     isSending: false,
-    logs: []
+    logs: [],
+    commandFeedback: null
   })
 }));
